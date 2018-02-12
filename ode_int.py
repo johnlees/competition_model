@@ -1,6 +1,7 @@
 #!python3
 
 # imports
+import sys
 from math import exp
 import numpy as np
 from scipy import integrate
@@ -54,7 +55,7 @@ def t_range(start, end, resolution):
 
 # Solve R and C as a function of t
 def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resolution,
-                   t_com, t_chal, t_end, C_size, R_size, stochastic = False, B_stren = 5)
+        t_com, t_chal, t_end, C_size, R_size, stochastic = False, B_stren = 5):
     if stochastic:
         G = brownian(B_stren)
 
@@ -99,7 +100,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
     else:
         N3 = integrate.odeint(dN_dt, N2_end, t3, args=(K, r_res, r_chal, a_RC, a_CR), Dfun=d2N_dt2)
 
-    return(np.concatenate((t0, t1, t2, t3)), np.concatenate((N1, N2, N3)))
+    return(np.concatenate((t0, t1, t2, t3)), np.concatenate((N0, N1, N2, N3)))
 
 
 ############
@@ -122,8 +123,8 @@ def pop_plot(time, populations, output_file, title):
     #plt.plot(t3, N3[:,0], 'r-')
     #plt.plot(t3, N3[:,1], 'b-')
 
-    plt.plot(time, population[:,0], 'r-', label='Resident')
-    plt.plot(time, population[:,1], 'b-', label='Challenger')
+    plt.plot(time, populations[:,0], 'r-', label='Resident')
+    plt.plot(time, populations[:,1], 'b-', label='Challenger')
 
     plt.grid()
     plt.legend(loc='best')
@@ -140,38 +141,38 @@ def pop_plot(time, populations, output_file, title):
 ####################
 
 # see log_growth_fit.R for estimates
-K = 43615            # carrying capacity
-r_res = 1.032        # growth rate (resident)
-r_chal = r_res       # growth rate (challenger)
+K = 43615           # carrying capacity
+r_res = 1.032       # growth rate (resident)
+r_chal = r_res      # growth rate (challenger)
 
 # competition terms
-gamma_res_chal = 1 # competition (challenger on resident)
-gamma_chal_res = 1 # competition (resident on challenger)
-beta = 1.1           # strength of effect of competence
+gamma_res_chal = 1  # competition (challenger on resident)
+gamma_chal_res = 1  # competition (resident on challenger)
+beta = 1.1          # strength of effect of competence
 
 # arrival times (in hours)
-t_com = 6      # time for competence to develop
-t_chal = 4     # time of arrival of challenger inoculum
-t_end = 10     # time to run integration in final step
+t_com = 6           # time for competence to develop
+t_chal = 4          # time of arrival of challenger inoculum
+t_end = 10          # time to run integration in final step
 
 # starting parameters
-C_size = 10000  # size of challenger inoculum
-R_size = 100     # size of resident inoculum
+C_size = 10000      # size of challenger inoculum
+R_size = 100        # size of resident inoculum
 
 # Brownian motion strength
-stochastic = False
-B_stren = 5000
+stochastic = False  # noise on/off
+B_stren = 5000         # strength of noise (scaled to popn size)
 
 ###################
 # Numerical setup #
 ###################
 
 # Number of points per hour
-resolution = 5000
+resolution = 1000
 
 # do the integral
 times, populations = solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resolution,
-                   t_com, t_chal, t_end, C_size, R_size, False, B_stren)
+                   t_com, t_chal, t_end, C_size, R_size, True, B_stren)
 
 ##########
 # Output #
@@ -183,3 +184,4 @@ if stochastic:
 else:
     pop_plot(times, populations, 'res_chal_deterministic.pdf', 'Resident vs. challenger (deterministic)')
 
+sys.exit(0)
