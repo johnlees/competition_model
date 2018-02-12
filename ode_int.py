@@ -122,8 +122,8 @@ def pop_plot(time, populations, output_file, title):
     #plt.plot(t3, N3[:,0], 'r-')
     #plt.plot(t3, N3[:,1], 'b-')
 
-    plt.plot(time, population[:,0], 'r-')
-    plt.plot(time, population[:,1], 'b-')
+    plt.plot(time, population[:,0], 'r-', label='Resident')
+    plt.plot(time, population[:,1], 'b-', label='Challenger')
 
     plt.grid()
     plt.legend(loc='best')
@@ -140,8 +140,8 @@ def pop_plot(time, populations, output_file, title):
 ####################
 
 # see log_growth_fit.R for estimates
-K = 67614            # carrying capacity
-r_res = 0.969752     # growth rate (resident)
+K = 43615            # carrying capacity
+r_res = 1.032        # growth rate (resident)
 r_chal = r_res       # growth rate (challenger)
 
 # competition terms
