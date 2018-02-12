@@ -26,8 +26,12 @@ def dN_dt(N, t, K, r_res, r_chal, a_RC, a_CR):
 # Closure, for use with sdeint
 def dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR):
     def f(N, t):
-        return np.array([ N[0]*(r_res/K)*(K-N[0]-a_RC*N[1]),
-                   N[1]*(r_chal/K)*(K-N[1]-a_CR*N[0])])
+        dN = np.array([ N[0]*(r_res/K)*(K-N[0]-a_RC*N[1]),
+                        N[1]*(r_chal/K)*(K-N[1]-a_CR*N[0])])
+        for i in range(N.shape[0]):
+            if (N[i] < 1):
+                dN[i] = 0
+        return dN
     return f
 
 # Jacobian
@@ -38,7 +42,10 @@ def d2N_dt2(N, t, K, r_res, r_chal, a_RC, a_CR):
 # Brownian motion
 def brownian(B_stren):
     B = np.diag([B_stren, B_stren])
-    def G(x, t):
+    def G(N, t):
+        for i in range(N.shape[0]):
+            if (N[i] < 1):
+                B[i,i] = 0
         return B
     return G
 
