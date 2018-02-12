@@ -2,7 +2,8 @@
 
 # imports
 import sys
-from math import exp
+from math import exp, log
+import random
 import numpy as np
 from scipy import integrate
 import sdeint
@@ -34,7 +35,7 @@ def dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR):
         return dN
     return f
 
-# Jacobian
+# Jacobian (deterministic model only)
 def d2N_dt2(N, t, K, r_res, r_chal, a_RC, a_CR):
     return np.array([[(r_res/K)*(K-2*N[0]-a_RC*N[1]), -(r_res/K)*N[0]*a_RC           ],
                   [-(r_chal/K)*N[1]*a_CR         , (r_chal/K)*(K-2*N[1]-a_CR*N[0])]])
@@ -46,6 +47,8 @@ def brownian(B_stren):
         for i in range(N.shape[0]):
             if (N[i] < 1):
                 B[i,i] = 0
+            else:
+                B[i,i] = B_stren
         return B
     return G
 
@@ -60,27 +63,66 @@ def t_range(start, end, resolution):
     points = int(round(resolution/(end-start)))
     return np.linspace(start, end, points)
 
+# Alternative stochastic algorithm
+def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
+    ta = []
+    Ra = []
+    Ca = []
+
+    t = 0
+    R = R_init
+    C = C_init
+    while (t < t_max - t_init):
+        # Previous step
+        ta.append(t)
+        Ra.append(R)
+        Ca.append(C)
+
+        # Rates
+        B_R = r_res * R
+        B_C = r_chal * C
+        D_R = r_res/K * R * (R + a_RC * C)
+        D_C = r_chal/K * C * (C + a_CR * R)
+
+        # Choose time interval based on total intensity
+        R_intensity = B_R + B_C + D_R + D_C
+        if (R == 0):
+            break
+        u1 = random.random()
+        t += -log(u1)/R
+
+        u2 = random.random()
+        if (u2 < B_R/R_intensity):
+            R += 1
+        elif (u2 > B_R/R_intensity and u2 < (B_R + D_R)/R_intensity):
+            R -= 1
+        elif (u2 > (B_R + D_R)/R_intensity and u2 < (B_R + D_R + B_C)/R_intensity):
+            C += 1
+        else:
+            C -= 1
+
+    t = t + t_init
+    return(np.array(ta), np.column_stack((Ra, Ca)))
+
 # Solve R and C as a function of t
 def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resolution,
-        t_com, t_chal, t_end, C_size, R_size, stochastic = False, B_stren = 5):
-    if stochastic:
-        G = brownian(B_stren)
+        t_com, t_chal, t_end, C_size, R_size, individual = False, stochastic = False, B_stren = 0):
 
     # integration is in three pieces
     t0 = t_range(0, t_chal, resolution)
-    N0 = np.vstack((log_grow_vec(K, R_size, r_res, t0), np.zeros(t0.shape[0]))).T
-    N0_end = np.array([log_grow(K, R_size, r_res, t_chal), C_size]) # initial conditions
+    if not stochastic and not individual:
+        N0 = np.vstack((log_grow_vec(K, R_size, r_res, t0), np.zeros(t0.shape[0]))).T
+        N0_end = np.array([log_grow(K, R_size, r_res, t_chal), C_size]) # initial conditions
+    else:
+        t0, N0 = integrate_piece(t0, np.array([R_size, 0]), K, r_res, r_chal, 0, 0, individual, stochastic, B_stren)
+        N0_end = np.array([N0[-1, 0], C_size])
+
     a_RC = gamma_res_chal
     a_CR = gamma_chal_res
-
     if (t_chal < t_com):
         # From arrival of challenger to development of competence
         t1 = t_range(t_chal, t_com, resolution)
-        if stochastic:
-            f = dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR)
-            N1 = sdeint.itoint(f, G, N0_end, t1)
-        else:
-            N1 = integrate.odeint(dN_dt, N0_end, t1, args=(K, r_res, r_chal, a_RC, a_CR), Dfun=d2N_dt2)
+        t1, N1 = integrate_piece(t1, N0_end, K, r_res, r_chal, a_RC, a_CR, individual, stochastic, B_stren)
 
         N1_end = N1[-1,:]
         t2 = t_range(t_com, t_com + t_chal, resolution)
@@ -91,23 +133,28 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
 
     # From development of competence in resident to development of competence in challenger
     a_CR = gamma_chal_res + beta
-    if stochastic:
-        f = dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR)
-        N2 = sdeint.itoint(f, G, N1_end, t2)
-    else:
-        N2 = integrate.odeint(dN_dt, N1_end, t2, args=(K, r_res, r_chal, a_RC, a_CR), Dfun=d2N_dt2)
+    t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, individual, stochastic, B_stren)
 
     # From development of competence in resident to development of competence in challenger
     t3 = t_range(t_com + t_chal, t_com + t_chal + t_end, resolution)
     N2_end = N2[-1,:]
     a_RC = gamma_res_chal + beta
-    if stochastic:
-        f = dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR)
-        N3 = sdeint.itoint(f, G, N2_end, t3)
-    else:
-        N3 = integrate.odeint(dN_dt, N2_end, t3, args=(K, r_res, r_chal, a_RC, a_CR), Dfun=d2N_dt2)
+    t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, individual, stochastic, B_stren)
 
     return(np.concatenate((t0, t1, t2, t3)), np.concatenate((N0, N1, N2, N3)))
+
+# Code to choose which integration method to use, given all model parameters
+def integrate_piece(t, N_end, K, r_res, r_chal, a_RC, a_CR, individual = False, stochastic = False, B_stren = 0):
+    if stochastic:
+        f = dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR)
+        G = brownian(B_stren)
+        N = sdeint.itoint(f, G, N_end, t)
+    elif individual:
+        t, N = gillespie(t[0], t[-1], N_end[0], N_end[1], K, r_res, r_chal, a_RC, a_CR)
+    else:
+        N = integrate.odeint(dN_dt, N_end, t, args=(K, r_res, r_chal, a_RC, a_CR), Dfun=d2N_dt2)
+
+    return(t, N)
 
 
 ############
@@ -168,7 +215,10 @@ R_size = 100        # size of resident inoculum
 
 # Brownian motion strength
 stochastic = False  # noise on/off
-B_stren = 5000         # strength of noise (scaled to popn size)
+B_stren = 0.5      # strength of noise (scaled to popn size)
+
+# Use the Gillespie algorithm
+individual = True  # also need to turn stochastic off
 
 ###################
 # Numerical setup #
@@ -179,7 +229,7 @@ resolution = 1000
 
 # do the integral
 times, populations = solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resolution,
-                   t_com, t_chal, t_end, C_size, R_size, True, B_stren)
+                   t_com, t_chal, t_end, C_size, R_size, individual, stochastic, B_stren)
 
 ##########
 # Output #
