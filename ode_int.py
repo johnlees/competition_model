@@ -101,7 +101,7 @@ def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
         else:
             C -= 1
 
-    t = t + t_init
+    ta += t_init
     return(np.array(ta), np.column_stack((Ra, Ca)))
 
 # Solve R and C as a function of t
@@ -210,7 +210,7 @@ t_chal = 4          # time of arrival of challenger inoculum
 t_end = 10          # time to run integration in final step
 
 # starting parameters
-C_size = 10000      # size of challenger inoculum
+C_size = 1000      # size of challenger inoculum
 R_size = 100        # size of resident inoculum
 
 # Brownian motion strength
@@ -218,7 +218,7 @@ stochastic = False  # noise on/off
 B_stren = 0.5      # strength of noise (scaled to popn size)
 
 # Use the Gillespie algorithm
-individual = True  # also need to turn stochastic off
+individual = False # also need to turn stochastic off
 
 ###################
 # Numerical setup #
@@ -238,6 +238,8 @@ times, populations = solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal
 # Draw plot
 if stochastic:
     pop_plot(times, populations, 'res_chal_stochastic.pdf', 'Resident vs. challenger (stochastic)')
+elif individual:
+    pop_plot(times, populations, 'res_chal_individual.pdf', 'Resident vs. challenger (individual)')
 else:
     pop_plot(times, populations, 'res_chal_deterministic.pdf', 'Resident vs. challenger (deterministic)')
 
