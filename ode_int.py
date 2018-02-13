@@ -146,7 +146,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
     # From development of competence in resident to development of competence in challenger
     t3 = t_range(t_com + t_chal, t_com + t_chal + t_end, resolution)
     N2_end = N2[-1,:]
-    a_RC = gamma_res_chal + beta
+    a_CR = gamma_chal_res
     t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, individual, stochastic, B_stren)
 
     return(np.concatenate((t0, t1, t2, t3)), np.concatenate((N0, N1, N2, N3)))
@@ -230,6 +230,7 @@ description = 'Lotka–Volterra model'
 parser = argparse.ArgumentParser(description=description,
                                      prog='ode_int')
 parser.add_argument('--mode', default="deterministic", help='Model to use {deterministic, stochastic, individual}')
+parser.add_argument('--output-prefix', default="res_chal", help='Output prefix for plot')
 parser.add_argument('--resolution', default=resolution, type=int, help='Number of points per hour')
 
 growth = parser.add_argument_group('Growth parameters')
@@ -271,10 +272,10 @@ times, populations = solve_integral(args.K, args.r_res, args.r_chal, args.g_RC, 
 
 # Draw plot
 if stochastic:
-    pop_plot(times, populations, 'res_chal_stochastic.pdf', 'Resident vs. challenger (stochastic)')
+    pop_plot(times, populations, args.output_prefix + 'stochastic.pdf', 'Resident vs. challenger (stochastic)')
 elif individual:
-    pop_plot(times, populations, 'res_chal_individual.pdf', 'Resident vs. challenger (individual)')
+    pop_plot(times, populations, args.output_prefix + 'individual.pdf', 'Resident vs. challenger (individual)')
 else:
-    pop_plot(times, populations, 'res_chal_deterministic.pdf', 'Resident vs. challenger (deterministic)')
+    pop_plot(times, populations, args.output_prefix + 'deterministic.pdf', 'Resident vs. challenger (deterministic)')
 
 sys.exit(0)
