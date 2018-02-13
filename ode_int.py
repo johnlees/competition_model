@@ -3,7 +3,9 @@
 # imports
 import sys
 from math import exp, log
+import argparse
 import random
+from numba import jit
 import numpy as np
 from scipy import integrate
 import sdeint
@@ -64,7 +66,8 @@ def t_range(start, end, resolution):
     return np.linspace(start, end, points)
 
 # Alternative stochastic algorithm
-def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
+@jit(nopython=True)
+def gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
     ta = []
     Ra = []
     Ca = []
@@ -101,7 +104,12 @@ def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
         else:
             C -= 1
 
-    ta += t_init
+    ta = [t + t_init for t in ta]
+    return(ta, Ra, Ca)
+
+# Wrapper for Gillespie algorithm, which is JIT compiled by numba
+def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
+    ta, Ra, Ca = gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR)
     return(np.array(ta), np.column_stack((Ra, Ca)))
 
 # Solve R and C as a function of t
@@ -164,19 +172,6 @@ def integrate_piece(t, N_end, K, r_res, r_chal, a_RC, a_CR, individual = False, 
 def pop_plot(time, populations, output_file, title):
     f1 = plt.figure()
 
-    #plt.plot(t0, N0[:,0], 'r-', label='Resident')
-    #plt.plot(t0, N0[:,1], 'b-', label='Challenger')
-
-    #if (t_chal < t_com):
-    #    plt.plot(t1, N1[:,0], 'r-')
-    #    plt.plot(t1, N1[:,1], 'b-')
-
-    #plt.plot(t2, N2[:,0], 'r-')
-    #plt.plot(t2, N2[:,1], 'b-')
-
-    #plt.plot(t3, N3[:,0], 'r-')
-    #plt.plot(t3, N3[:,1], 'b-')
-
     plt.plot(time, populations[:,0], 'r-', label='Resident')
     plt.plot(time, populations[:,1], 'b-', label='Challenger')
 
@@ -213,23 +208,62 @@ t_end = 10          # time to run integration in final step
 C_size = 1000      # size of challenger inoculum
 R_size = 100        # size of resident inoculum
 
-# Brownian motion strength
-stochastic = False  # noise on/off
-B_stren = 0.5      # strength of noise (scaled to popn size)
-
-# Use the Gillespie algorithm
-individual = False # also need to turn stochastic off
-
 ###################
 # Numerical setup #
 ###################
 
+# Brownian motion strength
+#stochastic = False  # noise on/off
+B_stren = 0.5      # strength of noise (scaled to popn size)
+
+# Use the Gillespie algorithm
+#individual = True # also need to turn stochastic off
+
 # Number of points per hour
 resolution = 1000
 
+#########
+# Input #
+#########
+
+description = 'Lotka–Volterra model'
+parser = argparse.ArgumentParser(description=description,
+                                     prog='ode_int')
+parser.add_argument('--mode', default="deterministic", help='Model to use {deterministic, stochastic, individual}')
+parser.add_argument('--resolution', default=resolution, type=int, help='Number of points per hour')
+
+growth = parser.add_argument_group('Growth parameters')
+growth.add_argument('--K', default=K, type=float, help='Carrying capacity')
+growth.add_argument('--r_res', default=r_res, type=float, help='Growth rate (resident)')
+growth.add_argument('--r_chal', default=r_chal, type=float, help='Growth rate (challenger)')
+growth.add_argument('--B-stren', default=B_stren, type=float, help='strength of noise (stochastic only)')
+
+competition = parser.add_argument_group('Competition terms')
+competition.add_argument('--g-RC', default=gamma_res_chal, type=float, help='competition (challenger on resident)')
+competition.add_argument('--g-CR', default=gamma_chal_res, type=float, help='competition (resident on challenger)')
+competition.add_argument('--beta', default=beta, type=float, help='strength of effect of competence')
+
+times = parser.add_argument_group('Arrival times (hrs)')
+times.add_argument('--t_com', default=t_com, type=float, help='time for competence to develop')
+times.add_argument('--t_chal', default=t_chal, type=float, help='time of arrival of challenger inoculum')
+times.add_argument('--t_end', default=t_end, type=float, help='time to run integration in final step')
+
+init = parser.add_argument_group('Starting sizes')
+init.add_argument('--C_size', default=C_size, type=float, help='size of challenger inoculum')
+init.add_argument('--R_size', default=R_size, type=float, help='size of resident inoculum')
+
+args = parser.parse_args()
+
+stochastic = False
+individual = False
+if args.mode == 'stochastic':
+    stochastic = True
+elif args.mode == 'individual':
+    individual = True
+
 # do the integral
-times, populations = solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resolution,
-                   t_com, t_chal, t_end, C_size, R_size, individual, stochastic, B_stren)
+times, populations = solve_integral(args.K, args.r_res, args.r_chal, args.g_RC, args.g_CR, args.beta, args.resolution,
+                   args.t_com, args.t_chal, args.t_end, args.C_size, args.R_size, individual, stochastic, args.B_stren)
 
 ##########
 # Output #
