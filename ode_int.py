@@ -65,7 +65,12 @@ def t_range(start, end, resolution):
     points = int(round(resolution/(end-start)))
     return np.linspace(start, end, points)
 
-# Alternative stochastic algorithm
+# Wrapper for Gillespie algorithm, which is JIT compiled by numba
+def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
+    ta, Ra, Ca = tau_leaping_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR)
+    return(np.array(ta), np.column_stack((Ra, Ca)))
+
+# CTMC stochastic algorithm
 @jit(nopython=True)
 def gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
     ta = []
@@ -89,10 +94,10 @@ def gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
 
         # Choose time interval based on total intensity
         R_intensity = B_R + B_C + D_R + D_C
-        if (R == 0):
+        if (R_intensity == 0):
             break
         u1 = random.random()
-        t += -log(u1)/R
+        t += -log(u1)/R_intensity
 
         u2 = random.random()
         if (u2 < B_R/R_intensity):
@@ -107,22 +112,57 @@ def gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
     ta = [t + t_init for t in ta]
     return(ta, Ra, Ca)
 
-# Wrapper for Gillespie algorithm, which is JIT compiled by numba
-def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
-    ta, Ra, Ca = gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR)
-    return(np.array(ta), np.column_stack((Ra, Ca)))
+# Alternative CTMC algorithm (should be faster, with appropriate tau)
+@jit(nopython=True)
+def tau_leaping_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR, tau = 0.001):
+    ta = []
+    Ra = []
+    Ca = []
+
+    t = 0
+    R = R_init
+    C = C_init
+    while (t < t_max - t_init):
+        # Previous step
+        ta.append(t)
+        Ra.append(R)
+        Ca.append(C)
+
+        # Rates
+        B_R = r_res * R
+        B_C = r_chal * C
+        D_R = r_res/K * R * (R + a_RC * C)
+        D_C = r_chal/K * C * (C + a_CR * R)
+
+        # Constant step sizes. Choose to be small
+        t += tau
+
+        # Choose tau based on Cao et al 2005. Or use max rate from theory (rK/4)
+        # tau = epsilon / max(B_R, B_C, D_R, D_C)
+
+        # Rates, Poisson distributed. First term is 'birth', second is 'death'. cf ODEs
+        R += (np.random.poisson(B_R * tau, 1) - np.random.poisson(D_R * tau, 1))[0]
+        C += (np.random.poisson(B_C * tau, 1) - np.random.poisson(D_C * tau, 1))[0]
+
+        if R < 0:
+            R = 0
+        if C < 0:
+            C = 0
+
+    ta = [t + t_init for t in ta]
+    return(ta, Ra, Ca)
 
 # Solve R and C as a function of t
 def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resolution,
-        t_com, t_chal, t_end, C_size, R_size, individual = False, stochastic = False, B_stren = 0):
+        t_com, t_chal, t_end, C_size, R_size, mode = 'ode', B_stren = 0):
 
     # integration is in three pieces
     t0 = t_range(0, t_chal, resolution)
-    if not stochastic and not individual:
+    if mode != 'ctmc':
         N0 = np.vstack((log_grow_vec(K, R_size, r_res, t0), np.zeros(t0.shape[0]))).T
         N0_end = np.array([log_grow(K, R_size, r_res, t_chal), C_size]) # initial conditions
     else:
-        t0, N0 = integrate_piece(t0, np.array([R_size, 0]), K, r_res, r_chal, 0, 0, individual, stochastic, B_stren)
+        t0, N0 = integrate_piece(t0, np.array([R_size, 0]), K, r_res, r_chal, 0, 0, mode, B_stren)
         N0_end = np.array([N0[-1, 0], C_size])
 
     a_RC = gamma_res_chal
@@ -130,7 +170,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
     if (t_chal < t_com):
         # From arrival of challenger to development of competence
         t1 = t_range(t_chal, t_com, resolution)
-        t1, N1 = integrate_piece(t1, N0_end, K, r_res, r_chal, a_RC, a_CR, individual, stochastic, B_stren)
+        t1, N1 = integrate_piece(t1, N0_end, K, r_res, r_chal, a_RC, a_CR, mode, B_stren)
 
         N1_end = N1[-1,:]
         t2 = t_range(t_com, t_com + t_chal, resolution)
@@ -141,23 +181,23 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
 
     # From development of competence in resident to development of competence in challenger
     a_CR = gamma_chal_res + beta
-    t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, individual, stochastic, B_stren)
+    t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode, B_stren)
 
     # From development of competence in resident to development of competence in challenger
     t3 = t_range(t_com + t_chal, t_com + t_chal + t_end, resolution)
     N2_end = N2[-1,:]
     a_CR = gamma_chal_res
-    t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, individual, stochastic, B_stren)
+    t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, mode, B_stren)
 
     return(np.concatenate((t0, t1, t2, t3)), np.concatenate((N0, N1, N2, N3)))
 
 # Code to choose which integration method to use, given all model parameters
-def integrate_piece(t, N_end, K, r_res, r_chal, a_RC, a_CR, individual = False, stochastic = False, B_stren = 0):
-    if stochastic:
+def integrate_piece(t, N_end, K, r_res, r_chal, a_RC, a_CR, mode = 'ode', B_stren = 0):
+    if mode == 'sde':
         f = dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR)
         G = brownian(B_stren)
         N = sdeint.itoint(f, G, N_end, t)
-    elif individual:
+    elif mode == 'ctmc':
         t, N = gillespie(t[0], t[-1], N_end[0], N_end[1], K, r_res, r_chal, a_RC, a_CR)
     else:
         N = integrate.odeint(dN_dt, N_end, t, args=(K, r_res, r_chal, a_RC, a_CR), Dfun=d2N_dt2)
@@ -229,7 +269,7 @@ resolution = 1000
 description = 'Lotka–Volterra model'
 parser = argparse.ArgumentParser(description=description,
                                      prog='ode_int')
-parser.add_argument('--mode', default="deterministic", help='Model to use {deterministic, stochastic, individual}')
+parser.add_argument('--mode', default="deterministic", help='Model to use {ode, sde, ctmc}')
 parser.add_argument('--output-prefix', default="res_chal", help='Output prefix for plot')
 parser.add_argument('--resolution', default=resolution, type=int, help='Number of points per hour')
 
@@ -255,27 +295,23 @@ init.add_argument('--R_size', default=R_size, type=float, help='size of resident
 
 args = parser.parse_args()
 
-stochastic = False
-individual = False
-if args.mode == 'stochastic':
-    stochastic = True
-elif args.mode == 'individual':
-    individual = True
+if args.mode != 'sde' and args.mode != 'ctmc':
+    args.mode = 'ode'
 
 # do the integral
 times, populations = solve_integral(args.K, args.r_res, args.r_chal, args.g_RC, args.g_CR, args.beta, args.resolution,
-                   args.t_com, args.t_chal, args.t_end, args.C_size, args.R_size, individual, stochastic, args.B_stren)
+                   args.t_com, args.t_chal, args.t_end, args.C_size, args.R_size, args.mode, args.B_stren)
 
 ##########
 # Output #
 ##########
 
 # Draw plot
-if stochastic:
-    pop_plot(times, populations, args.output_prefix + 'stochastic.pdf', 'Resident vs. challenger (stochastic)')
-elif individual:
-    pop_plot(times, populations, args.output_prefix + 'individual.pdf', 'Resident vs. challenger (individual)')
+if args.mode == 'sde':
+    pop_plot(times, populations, args.output_prefix + '_stochastic.pdf', 'Resident vs. challenger (stochastic)')
+elif args.mode == 'ctmc':
+    pop_plot(times, populations, args.output_prefix + '_ctmc.pdf', 'Resident vs. challenger (CTMC)')
 else:
-    pop_plot(times, populations, args.output_prefix + 'deterministic.pdf', 'Resident vs. challenger (deterministic)')
+    pop_plot(times, populations, args.output_prefix + '_deterministic.pdf', 'Resident vs. challenger (deterministic)')
 
 sys.exit(0)
