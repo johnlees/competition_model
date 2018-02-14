@@ -31,9 +31,6 @@ def dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR):
     def f(N, t):
         dN = np.array([ N[0]*(r_res/K)*(K-N[0]-a_RC*N[1]),
                         N[1]*(r_chal/K)*(K-N[1]-a_CR*N[0])])
-        for i in range(N.shape[0]):
-            if (N[i] < 1):
-                dN[i] = 0
         return dN
     return f
 
@@ -43,14 +40,10 @@ def d2N_dt2(N, t, K, r_res, r_chal, a_RC, a_CR):
                   [-(r_chal/K)*N[1]*a_CR         , (r_chal/K)*(K-2*N[1]-a_CR*N[0])]])
 
 # Brownian motion
-def brownian(B_stren):
-    B = np.diag([B_stren, B_stren])
+def brownian(K, r_res, r_chal, a_RC, a_CR):
     def G(N, t):
-        for i in range(N.shape[0]):
-            if (N[i] < 1):
-                B[i,i] = 0
-            else:
-                B[i,i] = B_stren
+        B = np.sqrt(np.diag([N[0]*(r_res/K)*(K+N[0]+a_RC*N[1]),
+                             N[1]*(r_chal/K)*(K+N[1]+a_CR*N[0])]))
         return B
     return G
 
@@ -154,7 +147,7 @@ def tau_leaping_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR,
 
 # Solve R and C as a function of t
 def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resolution,
-        t_com, t_chal, t_end, C_size, R_size, mode = 'ode', B_stren = 0):
+        t_com, t_chal, t_end, C_size, R_size, mode = 'ode'):
 
     # integration is in three pieces
     t0 = t_range(0, t_chal, resolution)
@@ -162,7 +155,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
         N0 = np.vstack((log_grow_vec(K, R_size, r_res, t0), np.zeros(t0.shape[0]))).T
         N0_end = np.array([log_grow(K, R_size, r_res, t_chal), C_size]) # initial conditions
     else:
-        t0, N0 = integrate_piece(t0, np.array([R_size, 0]), K, r_res, r_chal, 0, 0, mode, B_stren)
+        t0, N0 = integrate_piece(t0, np.array([R_size, 0]), K, r_res, r_chal, 0, 0, mode)
         N0_end = np.array([N0[-1, 0], C_size])
 
     a_RC = gamma_res_chal
@@ -170,7 +163,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
     if (t_chal < t_com):
         # From arrival of challenger to development of competence
         t1 = t_range(t_chal, t_com, resolution)
-        t1, N1 = integrate_piece(t1, N0_end, K, r_res, r_chal, a_RC, a_CR, mode, B_stren)
+        t1, N1 = integrate_piece(t1, N0_end, K, r_res, r_chal, a_RC, a_CR, mode)
 
         N1_end = N1[-1,:]
         t2 = t_range(t_com, t_com + t_chal, resolution)
@@ -181,21 +174,21 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
 
     # From development of competence in resident to development of competence in challenger
     a_CR = gamma_chal_res + beta
-    t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode, B_stren)
+    t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode)
 
     # From development of competence in resident to development of competence in challenger
     t3 = t_range(t_com + t_chal, t_com + t_chal + t_end, resolution)
     N2_end = N2[-1,:]
     a_CR = gamma_chal_res
-    t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, mode, B_stren)
+    t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, mode)
 
     return(np.concatenate((t0, t1, t2, t3)), np.concatenate((N0, N1, N2, N3)))
 
 # Code to choose which integration method to use, given all model parameters
-def integrate_piece(t, N_end, K, r_res, r_chal, a_RC, a_CR, mode = 'ode', B_stren = 0):
+def integrate_piece(t, N_end, K, r_res, r_chal, a_RC, a_CR, mode = 'ode'):
     if mode == 'sde':
         f = dN_dt_stochatic(K, r_res, r_chal, a_RC, a_CR)
-        G = brownian(B_stren)
+        G = brownian(K, r_res, r_chal, a_RC, a_CR)
         N = sdeint.itoint(f, G, N_end, t)
     elif mode == 'ctmc':
         t, N = gillespie(t[0], t[-1], N_end[0], N_end[1], K, r_res, r_chal, a_RC, a_CR)
@@ -252,13 +245,6 @@ R_size = 100        # size of resident inoculum
 # Numerical setup #
 ###################
 
-# Brownian motion strength
-#stochastic = False  # noise on/off
-B_stren = 0.5      # strength of noise (scaled to popn size)
-
-# Use the Gillespie algorithm
-#individual = True # also need to turn stochastic off
-
 # Number of points per hour
 resolution = 1000
 
@@ -277,7 +263,6 @@ growth = parser.add_argument_group('Growth parameters')
 growth.add_argument('--K', default=K, type=float, help='Carrying capacity')
 growth.add_argument('--r_res', default=r_res, type=float, help='Growth rate (resident)')
 growth.add_argument('--r_chal', default=r_chal, type=float, help='Growth rate (challenger)')
-growth.add_argument('--B-stren', default=B_stren, type=float, help='strength of noise (stochastic only)')
 
 competition = parser.add_argument_group('Competition terms')
 competition.add_argument('--g-RC', default=gamma_res_chal, type=float, help='competition (challenger on resident)')
@@ -300,7 +285,7 @@ if args.mode != 'sde' and args.mode != 'ctmc':
 
 # do the integral
 times, populations = solve_integral(args.K, args.r_res, args.r_chal, args.g_RC, args.g_CR, args.beta, args.resolution,
-                   args.t_com, args.t_chal, args.t_end, args.C_size, args.R_size, args.mode, args.B_stren)
+                   args.t_com, args.t_chal, args.t_end, args.C_size, args.R_size, args.mode)
 
 ##########
 # Output #
