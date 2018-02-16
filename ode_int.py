@@ -39,7 +39,7 @@ def d2N_dt2(N, t, K, r_res, r_chal, a_RC, a_CR):
     return np.array([[(r_res/K)*(K-2*N[0]-a_RC*N[1]), -(r_res/K)*N[0]*a_RC           ],
                   [-(r_chal/K)*N[1]*a_CR         , (r_chal/K)*(K-2*N[1]-a_CR*N[0])]])
 
-# Brownian motion
+# Brownian motion. No off-diagonal terms, as N, C covariance ignored in finite pop
 def brownian(K, r_res, r_chal, a_RC, a_CR):
     def G(N, t):
         B = np.sqrt(np.diag([N[0]*(r_res/K)*(K+N[0]+a_RC*N[1]),
@@ -151,7 +151,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
 
     # integration is in three pieces
     t0 = t_range(0, t_chal, resolution)
-    if mode != 'ctmc':
+    if mode == 'ode':
         N0 = np.vstack((log_grow_vec(K, R_size, r_res, t0), np.zeros(t0.shape[0]))).T
         N0_end = np.array([log_grow(K, R_size, r_res, t_chal), C_size]) # initial conditions
     else:
@@ -169,7 +169,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
         t2 = t_range(t_com, t_com + t_chal, resolution)
     else:
         # case where t_chal > t_com (only two pieces)
-        N1_end = N0
+        N1_end = N0_end
         t2 = t_range(t_chal, t_com + t_chal, resolution)
 
     # From development of competence in resident to development of competence in challenger
@@ -182,7 +182,14 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
     a_CR = gamma_chal_res
     t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, mode)
 
-    return(np.concatenate((t0, t1, t2, t3)), np.concatenate((N0, N1, N2, N3)))
+    if (t_chal < t_com):
+        t_series = np.concatenate((t0, t1, t2, t3))
+        N_series = np.concatenate((N0, N1, N2, N3))
+    else:
+        t_series = np.concatenate((t0, t2, t3))
+        N_series = np.concatenate((N0, N2, N3))
+
+    return(t_series, N_series)
 
 # Code to choose which integration method to use, given all model parameters
 def integrate_piece(t, N_end, K, r_res, r_chal, a_RC, a_CR, mode = 'ode'):
@@ -217,86 +224,88 @@ def pop_plot(time, populations, output_file, title):
     f1.savefig(output_file)
     plt.show()
 
+if __name__ == '__main__':
 
-####################
-# Model parameters #
-####################
+    ####################
+    # Model parameters #
+    ####################
 
-# see log_growth_fit.R for estimates
-K = 43615           # carrying capacity
-r_res = 1.032       # growth rate (resident)
-r_chal = r_res      # growth rate (challenger)
+    # see log_growth_fit.R for estimates
+    K = 43615           # carrying capacity
+    r_res = 1.032       # growth rate (resident)
+    r_chal = r_res      # growth rate (challenger)
 
-# competition terms
-gamma_res_chal = 1  # competition (challenger on resident)
-gamma_chal_res = 1  # competition (resident on challenger)
-beta = 1.1          # strength of effect of competence
+    # competition terms
+    gamma_res_chal = 1  # competition (challenger on resident)
+    gamma_chal_res = 1  # competition (resident on challenger)
+    beta = 1.1          # strength of effect of competence
 
-# arrival times (in hours)
-t_com = 6           # time for competence to develop
-t_chal = 4          # time of arrival of challenger inoculum
-t_end = 10          # time to run integration in final step
+    # arrival times (in hours)
+    t_com = 6           # time for competence to develop
+    t_chal = 4          # time of arrival of challenger inoculum
+    t_end = 10          # time to run integration in final step
 
-# starting parameters
-C_size = 1000      # size of challenger inoculum
-R_size = 100        # size of resident inoculum
+    # starting parameters
+    C_size = 1000      # size of challenger inoculum
+    R_size = 10        # size of resident inoculum
 
-###################
-# Numerical setup #
-###################
+    ###################
+    # Numerical setup #
+    ###################
 
-# Number of points per hour
-resolution = 1000
+    # Number of points per hour
+    resolution = 1000
 
-#########
-# Input #
-#########
+    #########
+    # Input #
+    #########
 
-description = 'Lotka–Volterra model'
-parser = argparse.ArgumentParser(description=description,
-                                     prog='ode_int')
-parser.add_argument('--mode', default="deterministic", help='Model to use {ode, sde, ctmc}')
-parser.add_argument('--output-prefix', default="res_chal", help='Output prefix for plot')
-parser.add_argument('--resolution', default=resolution, type=int, help='Number of points per hour')
+    description = 'Lotka–Volterra model'
+    parser = argparse.ArgumentParser(description=description,
+                                         prog='ode_int')
+    parser.add_argument('--mode', default="deterministic", help='Model to use {ode, sde, ctmc}')
+    parser.add_argument('--output-prefix', default="res_chal", help='Output prefix for plot')
+    parser.add_argument('--resolution', default=resolution, type=int, help='Number of points per hour')
 
-growth = parser.add_argument_group('Growth parameters')
-growth.add_argument('--K', default=K, type=float, help='Carrying capacity')
-growth.add_argument('--r_res', default=r_res, type=float, help='Growth rate (resident)')
-growth.add_argument('--r_chal', default=r_chal, type=float, help='Growth rate (challenger)')
+    growth = parser.add_argument_group('Growth parameters')
+    growth.add_argument('--K', default=K, type=float, help='Carrying capacity')
+    growth.add_argument('--r_res', default=r_res, type=float, help='Growth rate (resident)')
+    growth.add_argument('--r_chal', default=r_chal, type=float, help='Growth rate (challenger)')
 
-competition = parser.add_argument_group('Competition terms')
-competition.add_argument('--g-RC', default=gamma_res_chal, type=float, help='competition (challenger on resident)')
-competition.add_argument('--g-CR', default=gamma_chal_res, type=float, help='competition (resident on challenger)')
-competition.add_argument('--beta', default=beta, type=float, help='strength of effect of competence')
+    competition = parser.add_argument_group('Competition terms')
+    competition.add_argument('--g-RC', default=gamma_res_chal, type=float, help='competition (challenger on resident)')
+    competition.add_argument('--g-CR', default=gamma_chal_res, type=float, help='competition (resident on challenger)')
+    competition.add_argument('--beta', default=beta, type=float, help='strength of effect of competence')
 
-times = parser.add_argument_group('Arrival times (hrs)')
-times.add_argument('--t_com', default=t_com, type=float, help='time for competence to develop')
-times.add_argument('--t_chal', default=t_chal, type=float, help='time of arrival of challenger inoculum')
-times.add_argument('--t_end', default=t_end, type=float, help='time to run integration in final step')
+    times = parser.add_argument_group('Arrival times (hrs)')
+    times.add_argument('--t_com', default=t_com, type=float, help='time for competence to develop')
+    times.add_argument('--t_chal', default=t_chal, type=float, help='time of arrival of challenger inoculum')
+    times.add_argument('--t_end', default=t_end, type=float, help='time to run integration in final step')
 
-init = parser.add_argument_group('Starting sizes')
-init.add_argument('--C_size', default=C_size, type=float, help='size of challenger inoculum')
-init.add_argument('--R_size', default=R_size, type=float, help='size of resident inoculum')
+    init = parser.add_argument_group('Starting sizes')
+    init.add_argument('--C_size', default=C_size, type=float, help='size of challenger inoculum')
+    init.add_argument('--R_size', default=R_size, type=float, help='size of resident inoculum')
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-if args.mode != 'sde' and args.mode != 'ctmc':
-    args.mode = 'ode'
+    if args.mode != 'sde' and args.mode != 'ctmc':
+        args.mode = 'ode'
 
-# do the integral
-times, populations = solve_integral(args.K, args.r_res, args.r_chal, args.g_RC, args.g_CR, args.beta, args.resolution,
-                   args.t_com, args.t_chal, args.t_end, args.C_size, args.R_size, args.mode)
+    # do the integral
+    times, populations = solve_integral(args.K, args.r_res, args.r_chal, args.g_RC, args.g_CR, args.beta, args.resolution,
+                       args.t_com, args.t_chal, args.t_end, args.C_size, args.R_size, args.mode)
 
-##########
-# Output #
-##########
+    ##########
+    # Output #
+    ##########
 
-# Draw plot
-if args.mode == 'sde':
-    pop_plot(times, populations, args.output_prefix + '_stochastic.pdf', 'Resident vs. challenger (stochastic)')
-elif args.mode == 'ctmc':
-    pop_plot(times, populations, args.output_prefix + '_ctmc.pdf', 'Resident vs. challenger (CTMC)')
-else:
-    pop_plot(times, populations, args.output_prefix + '_deterministic.pdf', 'Resident vs. challenger (deterministic)')
+    # Draw plot
+    if args.mode == 'sde':
+        pop_plot(times, populations, args.output_prefix + '_stochastic.pdf', 'Resident vs. challenger (stochastic)')
+    elif args.mode == 'ctmc':
+        pop_plot(times, populations, args.output_prefix + '_ctmc.pdf', 'Resident vs. challenger (CTMC)')
+    else:
+        pop_plot(times, populations, args.output_prefix + '_deterministic.pdf', 'Resident vs. challenger (deterministic)')
 
-sys.exit(0)
+    sys.exit(0)
+
