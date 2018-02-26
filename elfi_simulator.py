@@ -40,7 +40,7 @@ if __name__ == '__main__':
               'gamma_res_chal': 1,
               'gamma_chal_res': 1,
               'resolution': 1000,
-              't_end': 30,
+              't_end': 48,
               'R_size': 10}
 
     experimental_conditions = []
