@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import elfi
 
-from .ode_int import solve_integral
+from ode_int import solve_integral
 
 def batch_integral(beta, t_com, experimental_conditions, params, batch_size=1, random_state=None):
 
@@ -14,7 +14,7 @@ def batch_integral(beta, t_com, experimental_conditions, params, batch_size=1, r
         final_pop = []
         for experiment in experimental_conditions:
             (C_size, t_chal) = experiment
-
+            sys.stderr.write(str(C_size) + "," + str(t_chal) + "\n")
             times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
                     params['gamma_res_chal'], params['gamma_chal_res'], beta, params['resolution'],
                     t_com, t_chal, params['t_end'], C_size, params['R_size'], mode = 'sde')
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     description = 'Fitting model'
     parser = argparse.ArgumentParser(description=description,
                                          prog='elfi_simulator.py')
-    parser.add_argument('--experiments', help='Experimental data')
+    parser.add_argument('--experiments', required=True, help='Experimental data')
     args = parser.parse_args()
 
     # experimental setup
@@ -46,18 +46,22 @@ if __name__ == '__main__':
     experimental_conditions = []
     obs = []
     with open(args.experiments, 'r') as experiment_file:
+        header = experiment_file.readline()
         for line in experiment_file:
             (C_size, t_chal, C_obs, R_obs) = line.rstrip().split("\t")
-            experimental_conditions.append((C_size, t_chal))
-            obs.append((R_obs, C_obs))
+            experimental_conditions.append((float(C_size), float(t_chal)))
+            obs.append((float(R_obs), float(C_obs)))
 
-    obs = np.asarray(obs)
+    real_obs = np.asarray(obs)
+
+    # Simulate with known beta and t_com to check it works
+    sim_obs = batch_integral(0.1, 5.0, experimental_conditions, params)
 
     # ELFI set-up
     beta = elfi.Prior(scipy.stats.gamma, a=2, scale=2)
     t_com = elfi.Prior(scipy.stats.gamma, a=4, scale=0.5)
 
-    Y = elfi.Simulator(batch_integral, beta, t_com, experimental_conditions, params, observed=obs)
+    Y = elfi.Simulator(batch_integral, beta, t_com, experimental_conditions, params, observed=sim_obs)
     d = elfi.Distance('euclidean', Y)
     log_d = elfi.Operation(np.log, 'd')
 

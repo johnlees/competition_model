@@ -133,7 +133,7 @@ def tau_leaping_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR,
         # Choose tau based on Cao et al 2005. Or use max rate from theory (rK/4)
         # tau = epsilon / max(B_R, B_C, D_R, D_C)
 
-        # Rates, Poisson distributed. First term is 'birth', second is 'death'. cf ODEs
+        # Rates, Poisson d0.0001istributed. First term is 'birth', second is 'death'. cf ODEs
         R += (np.random.poisson(B_R * tau, 1) - np.random.poisson(D_R * tau, 1))[0]
         C += (np.random.poisson(B_C * tau, 1) - np.random.poisson(D_C * tau, 1))[0]
 
@@ -150,44 +150,53 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
         t_com, t_chal, t_end, C_size, R_size, mode = 'ode'):
 
     # integration is in three pieces
-    t0 = t_range(0, t_chal, resolution)
-    if mode == 'ode':
-        N0 = np.vstack((log_grow_vec(K, R_size, r_res, t0), np.zeros(t0.shape[0]))).T
-        N0_end = np.array([log_grow(K, R_size, r_res, t_chal), C_size]) # initial conditions
+    if t_chal > 0:
+        t0 = t_range(0, t_chal, resolution)
+        if mode == 'ode':
+            N0 = np.vstack((log_grow_vec(K, R_size, r_res, t0), np.zeros(t0.shape[0]))).T
+            N0_end = np.array([log_grow(K, R_size, r_res, t_chal), C_size]) # initial conditions
+        else:
+            t0, N0 = integrate_piece(t0, np.array([R_size, 0]), K, r_res, r_chal, 0, 0, mode)
+            N0_end = np.array([N0[-1, 0], C_size])
+
+        a_RC = gamma_res_chal
+        a_CR = gamma_chal_res
+        if (t_chal < t_com):
+            # From arrival of challenger to development of competence
+            t1 = t_range(t_chal, t_com, resolution)
+            t1, N1 = integrate_piece(t1, N0_end, K, r_res, r_chal, a_RC, a_CR, mode)
+
+            N1_end = N1[-1,:]
+            t2 = t_range(t_com, t_com + t_chal, resolution)
+        else:
+            # case where t_chal > t_com (only two pieces)
+            N1_end = N0_end
+            t2 = t_range(t_chal, t_com + t_chal, resolution)
+
+        # From development of competence in resident to development of competence in challenger
+        a_CR = gamma_chal_res + beta
+        t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode)
+        # From development of competence in resident to development of competence in challenger
+        a_CR = gamma_chal_res + beta
+        t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode)
+
+        # From development of competence in resident to development of competence in challenger
+        t3 = t_range(t_com + t_chal, t_com + t_chal + t_end, resolution)
+        N2_end = N2[-1,:]
+        a_CR = gamma_chal_res
+        t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, mode)
+
+        if (t_chal < t_com):
+            t_series = np.concatenate((t0, t1, t2, t3))
+            N_series = np.concatenate((N0, N1, N2, N3))
+        else:
+            t_series = np.concatenate((t0, t2, t3))
+            N_series = np.concatenate((N0, N2, N3))
+
+    # If equal arrival, simple LV for all t
     else:
-        t0, N0 = integrate_piece(t0, np.array([R_size, 0]), K, r_res, r_chal, 0, 0, mode)
-        N0_end = np.array([N0[-1, 0], C_size])
-
-    a_RC = gamma_res_chal
-    a_CR = gamma_chal_res
-    if (t_chal < t_com):
-        # From arrival of challenger to development of competence
-        t1 = t_range(t_chal, t_com, resolution)
-        t1, N1 = integrate_piece(t1, N0_end, K, r_res, r_chal, a_RC, a_CR, mode)
-
-        N1_end = N1[-1,:]
-        t2 = t_range(t_com, t_com + t_chal, resolution)
-    else:
-        # case where t_chal > t_com (only two pieces)
-        N1_end = N0_end
-        t2 = t_range(t_chal, t_com + t_chal, resolution)
-
-    # From development of competence in resident to development of competence in challenger
-    a_CR = gamma_chal_res + beta
-    t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode)
-
-    # From development of competence in resident to development of competence in challenger
-    t3 = t_range(t_com + t_chal, t_com + t_chal + t_end, resolution)
-    N2_end = N2[-1,:]
-    a_CR = gamma_chal_res
-    t3, N3 = integrate_piece(t3, N2_end, K, r_res, r_chal, a_RC, a_CR, mode)
-
-    if (t_chal < t_com):
-        t_series = np.concatenate((t0, t1, t2, t3))
-        N_series = np.concatenate((N0, N1, N2, N3))
-    else:
-        t_series = np.concatenate((t0, t2, t3))
-        N_series = np.concatenate((N0, N2, N3))
+        t_series = t_range(0, t_end, resolution)
+        N_series = integrate_piece(t_series, np.array([R_size, C_size]), K, r_res, r_chal, gamma_res_chal, gamma_chal_res, mode)
 
     return(t_series, N_series)
 
@@ -241,9 +250,9 @@ if __name__ == '__main__':
     beta = 1.1          # strength of effect of competence
 
     # arrival times (in hours)
-    t_com = 6           # time for competence to develop
-    t_chal = 4          # time of arrival of challenger inoculum
-    t_end = 10          # time to run integration in final step
+    t_com = 6.0           # time for competence to develop
+    t_chal = 4.0          # time of arrival of challenger inoculum
+    t_end = 10.0          # time to run integration in final step
 
     # starting parameters
     C_size = 1000      # size of challenger inoculum
