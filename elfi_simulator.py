@@ -3,25 +3,23 @@
 # imports
 import sys
 import numpy as np
+import scipy.stats
 import elfi
 
 from ode_int import solve_integral
 
-def batch_integral(beta, t_com, experimental_conditions, params, batch_size=1, random_state=None):
+def multi_integral(beta, t_com, experimental_conditions, params, batch_size=1, random_state=None):
 
-    batched_pops = []
-    for i in range(0, batch_size):
-        final_pop = []
-        for experiment in experimental_conditions:
-            (C_size, t_chal) = experiment
-            sys.stderr.write(str(C_size) + "," + str(t_chal) + "\n")
-            times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
-                    params['gamma_res_chal'], params['gamma_chal_res'], beta, params['resolution'],
-                    t_com, t_chal, params['t_end'], C_size, params['R_size'], mode = 'sde')
-            final_pop.append((populations[-1,0], populations[-1,1]))
-        batched_pops.append(np.asarray(final_pop))
+    final_pop = []
+    for experiment in experimental_conditions:
+        (C_size, t_chal) = experiment
+        #sys.stderr.write(str(C_size) + "," + str(t_chal) + "\n")
+        times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
+                params['gamma_res_chal'], params['gamma_chal_res'], beta, params['resolution'],
+                t_com, t_chal, params['t_end'], C_size, params['R_size'], mode = 'sde')
+        final_pop.append((populations[-1,0], populations[-1,1]))
 
-    return(batched_pops)
+    return(np.asarray(final_pop))
 
 if __name__ == '__main__':
 
@@ -34,13 +32,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # experimental setup
+    sys.stderr.write("Reading in setup\n")
     params = {'K': 43615,
               'r_res': 1.032,
               'r_chal': 1.032,
               'gamma_res_chal': 1,
               'gamma_chal_res': 1,
               'resolution': 1000,
-              't_end': 48,
+              't_end': 10,
               'R_size': 10}
 
     experimental_conditions = []
@@ -55,27 +54,38 @@ if __name__ == '__main__':
     real_obs = np.asarray(obs)
 
     # Simulate with known beta and t_com to check it works
-    sim_obs = batch_integral(0.1, 5.0, experimental_conditions, params)
+    sys.stderr.write("Simulating observations beta = 0.1; t_com = 5.0\n")
+    sim_obs = multi_integral(0.1, 5.0, experimental_conditions, params)
+    np.savetxt("sim_obs.txt", sim_obs)
 
     # ELFI set-up
-    beta = elfi.Prior(scipy.stats.gamma, a=2, scale=2)
-    t_com = elfi.Prior(scipy.stats.gamma, a=4, scale=0.5)
+    # gamma params: a, loc, scale
+    sys.stderr.write("Setting up ELFI\n")
+    beta = elfi.Prior(scipy.stats.gamma, 2, 0, 2)
+    t_com = elfi.Prior(scipy.stats.gamma, 4, 0, 0.5)
 
-    Y = elfi.Simulator(batch_integral, beta, t_com, experimental_conditions, params, observed=sim_obs)
-    d = elfi.Distance('euclidean', Y)
-    log_d = elfi.Operation(np.log, 'd')
+    vectorized_simulator = elfi.tools.vectorize(multi_integral, [2, 3])
+    destack = lambda x: x.flatten().reshape(1, -1)
+
+    Y = elfi.Simulator(vectorized_simulator, beta, t_com, experimental_conditions, params, observed=sim_obs)
+    S = elfi.Summary(destack, Y)
+    d = elfi.Distance('euclidean', S)
+    log_d = elfi.Operation(np.log, d)
+    elfi.draw(log_d)
 
     # Fit w/ SMC ABC
-    smc = elfi.SMC(log_d, batch_size=10000, seed=1)
-    N = 1000
-    schedule = [0.7, 0.2, 0.05]
-    result_smc = smc.sample(N, schedule)
-    result_smc.summary(all=True)
-    result_smc.plot_marginals(all=True, bins=25, figsize=(8, 2), fontsize=12)
+    #sys.stderr.write("SMC inference\n")
+    #smc = elfi.SMC(log_d, batch_size=10000, seed=1)
+    #N = 1000
+    #schedule = [0.7, 0.2, 0.05]
+    #result_smc = smc.sample(N, schedule)
+    #result_smc.summary(all=True)
+    #result_smc.plot_marginals(all=True, bins=25, figsize=(8, 2), fontsize=12)
 
     # Run fit w/ BOLFI
+    sys.stderr.write("BOLFI inference\n")
     bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=10,
-                   bounds={'beta':(0, 5), 't_com':(0, 20)}, acq_noise_var=[0.1, 0.1], seed=seed)
+                   bounds={'beta':(0, 5), 't_com':(0, 20)}, acq_noise_var=[0.1, 0.1], seed=1)
     post = bolfi.fit(n_evidence=200)
 
     print(bolfi.target_model)

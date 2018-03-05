@@ -42,8 +42,8 @@ def d2N_dt2(N, t, K, r_res, r_chal, a_RC, a_CR):
 # Brownian motion. No off-diagonal terms, as N, C covariance ignored in finite pop
 def brownian(K, r_res, r_chal, a_RC, a_CR):
     def G(N, t):
-        B = np.sqrt(np.diag([N[0]*(r_res/K)*(K+N[0]+a_RC*N[1]),
-                             N[1]*(r_chal/K)*(K+N[1]+a_CR*N[0])]))
+        B = np.sqrt(np.diag([max(0, N[0]*(r_res/K)*(K+N[0]+a_RC*N[1])),
+                             max(0, N[1]*(r_chal/K)*(K+N[1]+a_CR*N[0]))]))
         return B
     return G
 
@@ -60,7 +60,7 @@ def t_range(start, end, resolution):
 
 # Wrapper for Gillespie algorithm, which is JIT compiled by numba
 def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
-    ta, Ra, Ca = tau_leaping_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR)
+    ta, Ra, Ca = gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR)
     return(np.array(ta), np.column_stack((Ra, Ca)))
 
 # CTMC stochastic algorithm
@@ -196,7 +196,7 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
     # If equal arrival, simple LV for all t
     else:
         t_series = t_range(0, t_end, resolution)
-        N_series = integrate_piece(t_series, np.array([R_size, C_size]), K, r_res, r_chal, gamma_res_chal, gamma_chal_res, mode)
+        t_series, N_series = integrate_piece(t_series, np.array([R_size, C_size]), K, r_res, r_chal, gamma_res_chal, gamma_chal_res, mode)
 
     return(t_series, N_series)
 
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     # competition terms
     gamma_res_chal = 1  # competition (challenger on resident)
     gamma_chal_res = 1  # competition (resident on challenger)
-    beta = 1.1          # strength of effect of competence
+    beta = 0.1          # strength of effect of competence
 
     # arrival times (in hours)
     t_com = 6.0           # time for competence to develop
