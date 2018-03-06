@@ -176,9 +176,6 @@ def solve_integral(K, r_res, r_chal, gamma_res_chal, gamma_chal_res, beta, resol
         # From development of competence in resident to development of competence in challenger
         a_CR = gamma_chal_res + beta
         t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode)
-        # From development of competence in resident to development of competence in challenger
-        a_CR = gamma_chal_res + beta
-        t2, N2 = integrate_piece(t2, N1_end, K, r_res, r_chal, a_RC, a_CR, mode)
 
         # From development of competence in resident to development of competence in challenger
         t3 = t_range(t_com + t_chal, t_com + t_chal + t_end, resolution)
