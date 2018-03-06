@@ -2,6 +2,7 @@
 
 # imports
 import sys
+import pickle
 import numpy as np
 import scipy.stats
 import elfi
@@ -16,7 +17,7 @@ def multi_integral(beta, t_com, experimental_conditions, params, batch_size=1, r
         #sys.stderr.write(str(C_size) + "," + str(t_chal) + "\n")
         times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
                 params['gamma_res_chal'], params['gamma_chal_res'], beta, params['resolution'],
-                t_com, t_chal, params['t_end'], C_size, params['R_size'], mode = 'sde')
+                t_com, t_chal, params['t_end'], C_size, params['R_size'], mode = params['mode'])
         final_pop.append((populations[-1,0], populations[-1,1]))
 
     return(np.asarray(final_pop))
@@ -40,7 +41,8 @@ if __name__ == '__main__':
               'gamma_chal_res': 1,
               'resolution': 1000,
               't_end': 10,
-              'R_size': 10}
+              'R_size': 10,
+              'mode': 'sde'}
 
     experimental_conditions = []
     obs = []
@@ -65,13 +67,13 @@ if __name__ == '__main__':
     t_com = elfi.Prior(scipy.stats.gamma, 4, 0, 0.5)
 
     vectorized_simulator = elfi.tools.vectorize(multi_integral, [2, 3])
-    destack = lambda x: x.flatten().reshape(1, -1)
+    log_destack = lambda x: np.log(x.flatten().reshape(1, -1) + 1)
 
     Y = elfi.Simulator(vectorized_simulator, beta, t_com, experimental_conditions, params, observed=sim_obs)
-    S = elfi.Summary(destack, Y)
+    S = elfi.Summary(log_destack, Y)
     d = elfi.Distance('euclidean', S)
-    log_d = elfi.Operation(np.log, d)
-    elfi.draw(log_d)
+    #log_d = elfi.Operation(np.log, d)
+    elfi.draw(d)
 
     # Fit w/ SMC ABC
     #sys.stderr.write("SMC inference\n")
@@ -84,18 +86,24 @@ if __name__ == '__main__':
 
     # Run fit w/ BOLFI
     sys.stderr.write("BOLFI inference\n")
-    bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=10,
-                   bounds={'beta':(0, 5), 't_com':(0, 20)}, acq_noise_var=[0.1, 0.1], seed=1)
+    bolfi = elfi.BOLFI(d, batch_size=1, initial_evidence=20, update_interval=10,
+                   bounds={'beta':(0, 5), 't_com':(0, 20)}, acq_noise_var=[0.05, 0.05], seed=1)
     post = bolfi.fit(n_evidence=200)
 
+    # Save results
+    pickle.dump(bolfi, open("bolfi.pkl", "wb"))
+    pickle.dump(post, open("posterior.pkl", "wb"))
+
+    # plot results
     print(bolfi.target_model)
     bolfi.plot_state()
     bolfi.plot_discrepancy
-
     post.plot(logpdf=True)
 
     result_BOLFI = bolfi.sample(1000, info_freq=1000)
     print(result_BOLFI)
+    result_BOLFI.plot_traces()
     result_BOLFI.plot_marginals()
+
 
 
