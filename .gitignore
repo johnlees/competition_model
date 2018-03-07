@@ -1,3 +1,8 @@
+# added
+.DS_Store
+*.html
+sim_obs.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

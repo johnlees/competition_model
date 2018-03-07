@@ -77,7 +77,7 @@ if __name__ == '__main__':
     S = elfi.Summary(log_destack, Y)
     d = elfi.Distance('euclidean', S)
     #log_d = elfi.Operation(np.log, d)
-    elfi.draw(d)
+    #elfi.draw(d)
 
     # Fit w/ SMC ABC
     #sys.stderr.write("SMC inference\n")
