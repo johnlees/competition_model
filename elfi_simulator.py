@@ -2,9 +2,13 @@
 
 # imports
 import sys
-import pickle
+import dill
 import numpy as np
+
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+
 import scipy.stats
 import elfi
 
@@ -94,9 +98,9 @@ if __name__ == '__main__':
                    bounds={'beta':(0.001, 5), 't_com':(0.01, 20)}, acq_noise_var=[0.05, 0.05], seed=1)
     post = bolfi.fit(n_evidence=200)
 
-    # Save results (cannot pickle functions)
-    #pickle.dump(bolfi, open("bolfi.pkl", "wb"))
-    #pickle.dump(post, open("posterior.pkl", "wb"))
+    # Save results
+    dill.dump(bolfi, open("bolfi.pkl", "wb"))
+    dill.dump(post, open("posterior.pkl", "wb"))
 
     # plot results
     print(bolfi.target_model)
