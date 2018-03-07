@@ -25,7 +25,7 @@ def multi_integral(beta, t_com, experimental_conditions, params, batch_size=1, r
 
 def log_destack(final_pops):
     x = final_pops.flatten().reshape(1, -1)
-    return(np.log(np.fmax(x, np.zeros(x.shape)) + 1)
+    return(np.log(np.fmax(x, np.zeros(x.shape)) + 1))
 
 if __name__ == '__main__':
 
