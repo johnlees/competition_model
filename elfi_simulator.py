@@ -72,8 +72,8 @@ if __name__ == '__main__':
     # ELFI set-up
     # gamma params: a, loc, scale
     sys.stderr.write("Setting up ELFI\n")
-    beta = elfi.Prior(scipy.stats.gamma, 1, 0, 0.5)
-    t_com = elfi.Prior(scipy.stats.gamma, 4, 0, 0.3)
+    beta = elfi.Prior(scipy.stats.uniform, 0, 3)
+    t_com = elfi.Prior(scipy.stats.uniform, 1, 5)
 
     vectorized_simulator = elfi.tools.vectorize(multi_integral, [2, 3])
 
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     # Run fit w/ BOLFI
     sys.stderr.write("BOLFI inference\n")
     bolfi = elfi.BOLFI(d, batch_size=1, initial_evidence=20, update_interval=10,
-                   bounds={'beta':(0.001, 5), 't_com':(0.01, 20)}, acq_noise_var=[0.05, 0.05], seed=1)
+                   bounds={'beta':(0.001, 3), 't_com':(0.01, 5)}, acq_noise_var=[0.05, 0.05], seed=1)
     post = bolfi.fit(n_evidence=200)
 
     # Save results
@@ -103,7 +103,6 @@ if __name__ == '__main__':
     dill.dump(post, open("posterior.pkl", "wb"))
 
     # plot results
-    print(bolfi.target_model)
     bolfi.plot_state()
     plt.savefig("bolfi_state.pdf")
     plt.close()
@@ -116,18 +115,24 @@ if __name__ == '__main__':
     plt.savefig("posterior.pdf")
     plt.close()
 
+    with open('bolfi_gp.txt', 'w') as gp_out:
+        gp_out.write(bolfi.target_model)
+
+    sys.exit(0)
+
     # sample from BOLFI posterior
-    sys.stderr.write("Sampling from BOLFI posterior\n")
-    result_BOLFI = bolfi.sample(1000, info_freq=1000)
-    print(result_BOLFI)
+    # this is now done separately
+    #sys.stderr.write("Sampling from BOLFI posterior\n")
+    #result_BOLFI = bolfi.sample(1000, info_freq=1000)
+    #print(result_BOLFI)
 
-    result_BOLFI.plot_traces()
-    plt.savefig("posterior_traces.pdf")
-    plt.close()
+    #result_BOLFI.plot_traces()
+    #plt.savefig("posterior_traces.pdf")
+    #plt.close()
 
-    result_BOLFI.plot_marginals()
-    plt.savefig("posterior_marginals.pdf")
-    plt.close()
+    #result_BOLFI.plot_marginals()
+    #plt.savefig("posterior_marginals.pdf")
+    #plt.close()
 
 
 
