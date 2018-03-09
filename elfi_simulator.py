@@ -95,7 +95,7 @@ if __name__ == '__main__':
     # Run fit w/ BOLFI
     sys.stderr.write("BOLFI inference\n")
     bolfi = elfi.BOLFI(d, batch_size=1, initial_evidence=20, update_interval=10,
-                   bounds={'beta':(0.001, 3), 't_com':(0.01, 5)}, acq_noise_var=[0.05, 0.05], seed=1)
+                   bounds={'beta':(0.001, 3), 't_com':(1, 6)}, acq_noise_var=[0.05, 0.05], seed=1)
     post = bolfi.fit(n_evidence=200)
 
     # Save results
@@ -114,9 +114,6 @@ if __name__ == '__main__':
     post.plot(logpdf=True)
     plt.savefig("posterior.pdf")
     plt.close()
-
-    with open('bolfi_gp.txt', 'w') as gp_out:
-        gp_out.write(bolfi.target_model)
 
     sys.exit(0)
 

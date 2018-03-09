@@ -22,9 +22,11 @@ if __name__ == '__main__':
     parser.add_argument('--bolfi', required=True, help='Bolfi dill')
     args = parser.parse_args()
 
-    # Save results
+    # Load results
     with open(args.bolfi, 'rb') as bolfi_dill:
         bolfi = dill.load(bolfi_dill)
+
+    print(bolfi.target_model)
 
     # sample from BOLFI posterior
     sys.stderr.write("Sampling from BOLFI posterior\n")
