@@ -31,10 +31,16 @@ if __name__ == '__main__':
     # sample from BOLFI posterior
     sys.stderr.write("Sampling from BOLFI posterior\n")
     result_BOLFI = bolfi.sample(1000, info_freq=1000)
+
     print(result_BOLFI)
+    np.savetxt("samples.txt", result_BOLFI.samples_array)
 
     result_BOLFI.plot_traces()
     plt.savefig("posterior_traces.pdf")
+    plt.close()
+
+    result_BOLFI.plot_pairs()
+    plt.savefig("pair_traces.pdf")
     plt.close()
 
     result_BOLFI.plot_marginals()
