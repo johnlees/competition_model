@@ -35,7 +35,7 @@ if __name__ == '__main__':
               'mode': 'ctmc'}
 
     C_steps = [1, 3, 10, 30, 100, 300, 1000, 3000, 10000]
-    t_steps = [float(x)*0.1 for x in list(range(0, 100, 1))]
+    t_steps = np.linspace(0, 10, 0.1)
 
     with open('isogenic_runs.txt', 'w') as outfile:
         outfile.write("\t".join(["C_size", "t_chal", "avg_C"]) + "\n")
