@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm
 
+from scipy.ndimage.filters import gaussian_filter
+
 import argparse
 
 description = 'Calculate model regimes'
@@ -20,9 +22,12 @@ with open(args.runs, 'r') as run_file:
         y.append(float(y_val))
         z.append(float(z_val))
 
-x = np.array(x).reshape(len(np.unique(x)), len(np.unique(y)))
-y = np.array(y).reshape(len(np.unique(x)), len(np.unique(y)))
-z = np.array(z).reshape(len(np.unique(x)), len(np.unique(y)))
+x = np.array(x).reshape(len(np.unique(y)), len(np.unique(x)))
+y = np.array(y).reshape(len(np.unique(y)), len(np.unique(x)))
+z = np.array(z).reshape(len(np.unique(y)), len(np.unique(x)))
+
+# Smooth out noise
+smooth_z = gaussian_filter(z, 2)
 
 # Default delta is large because that makes it fast, and it illustrates
 # the correct registration between image and contours.
@@ -30,42 +35,38 @@ delta = 0.5
 
 #extent = (-3, 4, -4, 3)
 
-# Boost the upper limit to avoid truncation errors.
-#levels = np.arange(-2.0, 1.601, 0.4)
-levels=np.array([0, 1, 2, 3])
+# position of contours
+#all_levels=np.array([0, 1, 2, 3, 4, 5])
+win_levels=np.array([0, 1])
 
-norm = cm.colors.Normalize(vmax=abs(z).max(), vmin=-abs(z).max())
+norm = cm.colors.Normalize(vmax=abs(smooth_z).max(), vmin=-abs(smooth_z).max())
 cmap = cm.PRGn
 
 fig, ax = plt.subplots()
 ax.set_yscale("log")
+ax.set_xlabel('Arrival time (lag)')
+ax.set_ylabel('Challenger inoculum')
 
-cset1 = plt.contourf(x, y, z, levels,
-                     cmap=cm.get_cmap(cmap, len(levels) - 1), norm=norm)
-# It is not necessary, but for the colormap, we need only the
-# number of levels minus 1.  To avoid discretization error, use
-# either this number or a large number such as the default (256).
+# heatmap
+#plt.imshow(z)
+#plt.show()
 
-# If we want lines as well as filled regions, we need to call
-# contour separately; don't try to change the edgecolor or edgewidth
-# of the polygons in the collections returned by contourf.
-# Use levels output from previous call to guarantee they are the same.
+cset1 = plt.contourf(x, y, smooth_z, win_levels, alpha = 0.5)
+                     #cmap=cm.get_cmap(cmap, len(levels) - 1), norm=norm)
 
-cset2 = plt.contour(x, y, z, cset1.levels, colors='k')
+# Draw a lines on the countour boundaries
+#cset2 = plt.contour(x, y, smooth_z, cset1.levels, colors='r')
 
-# We don't really need dashed contour lines to indicate negative
-# regions, so let's turn them off.
+# Turn off dashed countours
+#for c in cset2.collections:
+#    c.set_linestyle('solid')
 
-for c in cset2.collections:
-    c.set_linestyle('solid')
+# Resident wins boundary
+cset3 = plt.contour(x, y, smooth_z, win_levels, colors='r', linewidths=2)
+plt.title('Isogenic challenger')
+#plt.colorbar(cset1) # legend
 
-# It is easier here to make a separate call to contour than
-# to set up an array of colors and linewidths.
-# We are making a thick green line as a zero contour.
-# Specify the zero level as a tuple with only 0 in it.
-
-cset3 = plt.contour(z, y, z, (0,), colors='g', linewidths=2)
-plt.title('Filled contours')
-plt.colorbar(cset1)
+# t_com
+plt.axvline(x=3.76, color = 'k', linestyle='--')
 
 plt.show()
