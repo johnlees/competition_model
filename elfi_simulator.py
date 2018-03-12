@@ -80,7 +80,7 @@ if __name__ == '__main__':
     Y = elfi.Simulator(vectorized_simulator, beta, t_com, experimental_conditions, params, observed=sim_obs)
     S = elfi.Summary(log_destack, Y)
     d = elfi.Distance('euclidean', S)
-    #log_d = elfi.Operation(np.log, d)
+    log_d = elfi.Operation(np.log, d)
     #elfi.draw(d)
 
     # Fit w/ SMC ABC
@@ -94,8 +94,8 @@ if __name__ == '__main__':
 
     # Run fit w/ BOLFI
     sys.stderr.write("BOLFI inference\n")
-    bolfi = elfi.BOLFI(d, batch_size=1, initial_evidence=20, update_interval=10,
-                   bounds={'beta':(0.001, 3), 't_com':(1, 6)}, acq_noise_var=[0.05, 0.05], seed=1)
+    bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=10,
+                   bounds={'beta':(0.001, 3), 't_com':(1, 6)}, acq_noise_var=[0.01, 0.01], seed=1)
     post = bolfi.fit(n_evidence=200)
 
     # Save results
