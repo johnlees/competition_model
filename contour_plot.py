@@ -9,6 +9,9 @@ import argparse
 description = 'Calculate model regimes'
 parser = argparse.ArgumentParser()
 parser.add_argument('--runs', required=True, help='Runs of simulator')
+parser.add_argument('--boundary', type=float, default=10.0, help='Population boundary line')
+parser.add_argument('--output', default='isogenic_domains', help='Output prefix')
+parser.add_argument('--smooth', action='store_true', default=False, help='Smooth noisy data')
 args = parser.parse_args()
 
 x = []
@@ -27,7 +30,8 @@ y = np.array(y).reshape(len(np.unique(y)), len(np.unique(x)))
 z = np.array(z).reshape(len(np.unique(y)), len(np.unique(x)))
 
 # Smooth out noise
-smooth_z = gaussian_filter(z, 2)
+if args.smooth:
+    z = gaussian_filter(z, 2)
 
 # Default delta is large because that makes it fast, and it illustrates
 # the correct registration between image and contours.
@@ -37,9 +41,9 @@ delta = 0.5
 
 # position of contours
 #all_levels=np.array([0, 1, 2, 3, 4, 5])
-win_levels=np.array([0, 1])
+win_levels=np.array([0, args.boundary])
 
-norm = cm.colors.Normalize(vmax=abs(smooth_z).max(), vmin=-abs(smooth_z).max())
+norm = cm.colors.Normalize(vmax=abs(z).max(), vmin=-abs(z).max())
 cmap = cm.PRGn
 
 fig, ax = plt.subplots()
@@ -51,7 +55,7 @@ ax.set_ylabel('Challenger inoculum')
 #plt.imshow(z)
 #plt.show()
 
-cset1 = plt.contourf(x, y, smooth_z, win_levels, alpha = 0.5)
+cset1 = plt.contourf(x, y, z, win_levels, cmap='Pastel1')
                      #cmap=cm.get_cmap(cmap, len(levels) - 1), norm=norm)
 
 # Draw a lines on the countour boundaries
@@ -62,11 +66,12 @@ cset1 = plt.contourf(x, y, smooth_z, win_levels, alpha = 0.5)
 #    c.set_linestyle('solid')
 
 # Resident wins boundary
-cset3 = plt.contour(x, y, smooth_z, win_levels, colors='r', linewidths=2)
+cset3 = plt.contour(x, y, z, win_levels, colors='r', linewidths=2)
 plt.title('Isogenic challenger')
 #plt.colorbar(cset1) # legend
 
 # t_com
 plt.axvline(x=3.76, color = 'k', linestyle='--')
+plt.savefig(args.output + ".pdf")
+plt.close()
 
-plt.show()
