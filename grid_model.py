@@ -21,6 +21,10 @@ if __name__ == '__main__':
     parser.add_argument('--repeats', type=int, default = 100, help='Number of simulator runs [default: 100]')
     parser.add_argument('--mode', default='ctmc', help='Mode of integral')
     parser.add_argument('--output', type=str, required=True, help='Output prefix')
+    parser.add_argument('--isogenic', action='store_true', default=False, help='Run isogenic simulations')
+    parser.add_argument('--intergenic', action='store_true', default=False, help='Run intergenic simulations')
+    parser.add_argument('--t-chal', default = 24, type=float, help='t_chal in intergenic simulations')
+    parser.add_argument('--threshold', default = 1, type=float, help='Threshold for declaring co-existence')
     args = parser.parse_args()
 
     # isogenic setup
@@ -39,21 +43,68 @@ if __name__ == '__main__':
     C_steps = [1, 3, 10, 30, 100, 300, 1000, 3000, 10000]
     t_steps = np.linspace(0, 24, 1000)
 
-    with open(args.output + '.isogenic_runs.txt', 'w') as outfile:
-        outfile.write("\t".join(["C_size", "t_chal", "avg_C"]) + "\n")
-        for C_size in C_steps:
-            sys.stderr.write("C_size: " + str(C_size) + "\n")
-            for t_chal in t_steps:
-                sys.stderr.write("t_chal: " + str(t_chal) + "\n")
-                final_C_pop = []
-                for repeat in range(0, args.repeats):
-                    times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
-                    params['gamma_res_chal'], params['gamma_chal_res'], params['beta'], params['resolution'],
-                    params['t_com'], t_chal, params['t_end'], C_size, params['R_size'], mode = params['mode'])
+    if args.isogenic:
+        with open(args.output + '.isogenic_runs.txt', 'w') as outfile:
+            outfile.write("\t".join(["C_size", "t_chal", "avg_C"]) + "\n")
+            for C_size in C_steps:
+                sys.stderr.write("C_size: " + str(C_size) + "\n")
+                for t_chal in t_steps:
+                    sys.stderr.write("t_chal: " + str(t_chal) + "\n")
+                    final_C_pop = []
+                    for repeat in range(0, args.repeats):
+                        times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
+                        params['gamma_res_chal'], params['gamma_chal_res'], params['beta'], params['resolution'],
+                        params['t_com'], t_chal, params['t_end'], C_size, params['R_size'], mode = params['mode'])
 
-                    final_C_pop.append(populations[-1,1])
+                        final_C_pop.append(populations[-1,1])
 
-                avg_C = sum(final_C_pop)/float(len(final_C_pop))
-                outfile.write("\t".join([str(C_size), str(t_chal), str(avg_C)]) + "\n")
+                    avg_C = sum(final_C_pop)/float(len(final_C_pop))
+                    outfile.write("\t".join([str(C_size), str(t_chal), str(avg_C)]) + "\n")
+
+    # intergenic setup
+    params = {'K': 43615,
+              't_com': 3.76,
+              'beta': 1.48,
+              'r_res': 1.032,
+              'gamma_chal_res': 1,
+              'resolution': 100,
+              't_end': 36,
+              'R_size': 10,
+              'C_size': 10,
+              't_chal': args.t_chal,
+              'mode': args.mode}
+
+    gamma_res_chal_steps = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100]
+    r_chal_steps = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100]
+    r_chal_steps = [x * params['r_res'] for x in r_chal_steps]
+
+    if args.intergenic:
+        with open(args.output + '.intergenic_runs.txt', 'w') as outfile:
+            outfile.write("\t".join(["gamma_ratio", "r_ratio", "final_R", "final_C", "domain"]) + "\n")
+            for gamma in gamma_res_chal_steps:
+                sys.stderr.write("gamma: " + str(gamma) + "\n")
+                for r in r_chal_steps:
+                    sys.stderr.write("r: " + str(r) + "\n")
+                    final_R_pop = []
+                    final_C_pop = []
+                    for repeat in range(0, args.repeats):
+                        times, populations = solve_integral(params['K'], params['r_res'], r,
+                        gamma, params['gamma_chal_res'], params['beta'], params['resolution'],
+                        params['t_com'], params['t_chal'], params['t_end'], params['C_size'], params['R_size'], mode = params['mode'])
+
+                        final_R_pop.append(populations[-1,0])
+                        final_C_pop.append(populations[-1,1])
+
+                    avg_R = sum(final_R_pop)/float(len(final_R_pop))
+                    avg_C = sum(final_C_pop)/float(len(final_C_pop))
+                    if avg_R > args.threshold and avg_C > args.threshold > 1:
+                        domain = 0.5 # co-existence
+                    elif avg_R > args.threshold:
+                        domain = 1 # resident wins
+                    elif avg_C > args.threshold:
+                        domain = 0 # challenger wins
+                    else:
+                        domain = -1 # both dead
+                    outfile.write("\t".join([str(gamma), str(r), str(avg_R), str(avg_C), str(domain)]) + "\n")
 
     sys.exit(0)
