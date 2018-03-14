@@ -74,17 +74,16 @@ if __name__ == '__main__':
               't_chal': args.t_chal,
               'mode': args.mode}
 
-    gamma_res_chal_steps = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100]
-    r_chal_steps = [0.01, 0.03, 0.1, 0.3, 1, 3, 10, 30, 100]
-    r_chal_steps = [x * params['r_res'] for x in r_chal_steps]
+    gamma_res_chal_steps = np.power(10, np.linspace(-2, 2, 50))
+    r_chal_steps = params['r_res'] * np.power(10, np.linspace(-1, 1, 50))
 
     if args.intergenic:
         with open(args.output + '.intergenic_runs.txt', 'w') as outfile:
             outfile.write("\t".join(["gamma_ratio", "r_ratio", "final_R", "final_C", "domain"]) + "\n")
             for gamma in gamma_res_chal_steps:
-                sys.stderr.write("gamma: " + str(gamma) + "\n")
+                #sys.stderr.write("gamma: " + str(gamma) + "\n")
                 for r in r_chal_steps:
-                    sys.stderr.write("r: " + str(r) + "\n")
+                    #sys.stderr.write("r: " + str(r) + "\n")
                     final_R_pop = []
                     final_C_pop = []
                     for repeat in range(0, args.repeats):
@@ -97,7 +96,7 @@ if __name__ == '__main__':
 
                     avg_R = sum(final_R_pop)/float(len(final_R_pop))
                     avg_C = sum(final_C_pop)/float(len(final_C_pop))
-                    if avg_R > args.threshold and avg_C > args.threshold > 1:
+                    if avg_R > args.threshold and avg_C > args.threshold:
                         domain = 0.5 # co-existence
                     elif avg_R > args.threshold:
                         domain = 1 # resident wins
