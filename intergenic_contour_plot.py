@@ -31,12 +31,12 @@ z = np.array(z).reshape(len(np.unique(y)), len(np.unique(x)))
 
 # Smooth out noise
 if args.smooth:
-    z = gaussian_filter(z, 0.8)
+    z = gaussian_filter(z, 0.6)
 
 #extent = (-3, 4, -4, 3)
 
 # position of contours
-levels=np.array([0, 0.33, 0.67, 1])
+levels=np.array([0, 0.49, 0.51, 1])
 #levels=np.linspace(0,1,11)
 
 norm = cm.colors.Normalize(vmax=1, vmin=0)
@@ -45,8 +45,8 @@ cmap = cm.coolwarm
 fig, ax = plt.subplots()
 ax.set_xscale("log")
 ax.set_yscale("log")
-ax.set_xlabel('Ratio of gammas (challenger vs. resident)')
-ax.set_ylabel('Ratio of growth rates (challenger vs. resident)')
+ax.set_xlabel('Gamma (challenger -> resident)')
+ax.set_ylabel('Gamma (resident -> challenger)')
 
 cset1 = plt.contourf(x, y, z, levels, colors=('#fc8d59', '#ffffbf', '#91bfdb'))
 #cset1.cmap.set_under('yellow')
@@ -54,7 +54,7 @@ cset1 = plt.contourf(x, y, z, levels, colors=('#fc8d59', '#ffffbf', '#91bfdb'))
 #cset1 = plt.contourf(x, y, z, levels, cmap='coolwarm')
 
 # Resident wins boundary
-cset3 = plt.contour(x, y, z, levels, colors='k', linewidths=1)
+cset3 = plt.contour(x, y, z, levels, colors='k', linewidths=2)
 plt.title(args.title)
 #plt.colorbar(cset1) # legend
 #plt.clabel(cset3, fmt='%2.1f', colors='k', fontsize=14) # contour labels

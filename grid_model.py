@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--intergenic', action='store_true', default=False, help='Run intergenic simulations')
     parser.add_argument('--t-chal', default = 24, type=float, help='t_chal in intergenic simulations')
     parser.add_argument('--threshold', default = 1, type=float, help='Threshold for declaring co-existence')
+    parser.add_argument('--resolution', default = 50, type=int, help='Number of points to draw')
     args = parser.parse_args()
 
     # isogenic setup
@@ -66,7 +67,7 @@ if __name__ == '__main__':
               't_com': 3.76,
               'beta': 1.48,
               'r_res': 1.032,
-              'gamma_chal_res': 1,
+              'r_chal': 1.032,
               'resolution': 100,
               't_end': 36,
               'R_size': 10,
@@ -74,21 +75,21 @@ if __name__ == '__main__':
               't_chal': args.t_chal,
               'mode': args.mode}
 
-    gamma_res_chal_steps = np.power(10, np.linspace(-2, 2, 50))
-    r_chal_steps = params['r_res'] * np.power(10, np.linspace(-1, 1, 50))
+    gamma_res_chal_steps = np.power(10, np.linspace(-2, 2, args.resolution))
+    gamma_chal_res_steps = np.power(10, np.linspace(-2, 2, args.resolution))
 
     if args.intergenic:
         with open(args.output + '.intergenic_runs.txt', 'w') as outfile:
-            outfile.write("\t".join(["gamma_ratio", "r_ratio", "final_R", "final_C", "domain"]) + "\n")
-            for gamma in gamma_res_chal_steps:
+            outfile.write("\t".join(["gamma_rc", "gamma_cr", "final_R", "final_C", "domain"]) + "\n")
+            for gamma_rc in gamma_res_chal_steps:
                 #sys.stderr.write("gamma: " + str(gamma) + "\n")
-                for r in r_chal_steps:
+                for gamma_cr in gamma_chal_res_steps:
                     #sys.stderr.write("r: " + str(r) + "\n")
                     final_R_pop = []
                     final_C_pop = []
                     for repeat in range(0, args.repeats):
-                        times, populations = solve_integral(params['K'], params['r_res'], r,
-                        gamma, params['gamma_chal_res'], params['beta'], params['resolution'],
+                        times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
+                        gamma_rc, gamma_cr, params['beta'], params['resolution'],
                         params['t_com'], params['t_chal'], params['t_end'], params['C_size'], params['R_size'], mode = params['mode'])
 
                         final_R_pop.append(populations[-1,0])
@@ -104,6 +105,6 @@ if __name__ == '__main__':
                         domain = 0 # challenger wins
                     else:
                         domain = -1 # both dead
-                    outfile.write("\t".join([str(gamma), str(r), str(avg_R), str(avg_C), str(domain)]) + "\n")
+                    outfile.write("\t".join([str(gamma_rc), str(gamma_cr), str(avg_R), str(avg_C), str(domain)]) + "\n")
 
     sys.exit(0)
