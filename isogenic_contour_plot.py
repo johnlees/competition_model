@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import cm
+from matplotlib import cm, ticker
+from math import log
 
 from scipy.ndimage.filters import gaussian_filter
 
@@ -20,10 +21,12 @@ z = []
 with open(args.runs, 'r') as run_file:
     header = run_file.readline()
     for line in run_file:
-        (y_val, x_val, z_val) = line.rstrip().split("\t")
-        x.append(float(x_val))
-        y.append(float(y_val))
-        z.append(float(z_val))
+        (C_size, t_chal, avg_R, avg_C) = line.rstrip().split("\t")
+        if float(avg_C) < 1:
+            avg_C = 0.001
+        x.append(float(t_chal))
+        y.append(float(C_size))
+        z.append(float(avg_C))
 
 x = np.array(x).reshape(len(np.unique(y)), len(np.unique(x)))
 y = np.array(y).reshape(len(np.unique(y)), len(np.unique(x)))
@@ -31,17 +34,13 @@ z = np.array(z).reshape(len(np.unique(y)), len(np.unique(x)))
 
 # Smooth out noise
 if args.smooth:
-    z = gaussian_filter(z, 2)
-
-# Default delta is large because that makes it fast, and it illustrates
-# the correct registration between image and contours.
-delta = 0.5
+    z = gaussian_filter(z, 1)
 
 #extent = (-3, 4, -4, 3)
 
 # position of contours
-#all_levels=np.array([0, 1, 2, 3, 4, 5])
 win_levels=np.array([0, args.boundary])
+all_levels=np.array([0, 1, 10, 100, 1000])
 
 norm = cm.colors.Normalize(vmax=abs(z).max(), vmin=-abs(z).max())
 cmap = cm.PRGn
@@ -51,27 +50,21 @@ ax.set_yscale("log")
 ax.set_xlabel('Arrival time (lag)')
 ax.set_ylabel('Challenger inoculum')
 
-# heatmap
-#plt.imshow(z)
-#plt.show()
-
-cset1 = plt.contourf(x, y, z, win_levels, cmap='Pastel1')
+cset1 = plt.contourf(x, y, z, win_levels, locator=ticker.LogLocator(), colors=('#fc8d59', '#ffffbf'))
                      #cmap=cm.get_cmap(cmap, len(levels) - 1), norm=norm)
+# t_com
+plt.axvline(x=3.76, color = 'k', linestyle='--', label='t_com')
+plt.text(3.0, 3000, 't_com',rotation=90)
 
-# Draw a lines on the countour boundaries
-#cset2 = plt.contour(x, y, smooth_z, cset1.levels, colors='r')
-
-# Turn off dashed countours
-#for c in cset2.collections:
-#    c.set_linestyle('solid')
+cset2 = plt.contour(x, y, z, all_levels, locator=ticker.LogLocator(), colors='k', linewidths = 1)
+plt.clabel(cset2, fmt='%1.0f', inline=1, fontsize=10)
 
 # Resident wins boundary
-cset3 = plt.contour(x, y, z, win_levels, colors='r', linewidths=2)
+#cset3 = plt.contour(x, y, z, win_levels, colors='k', linewidths=2)
 plt.title('Isogenic challenger')
 #plt.colorbar(cset1) # legend
 
-# t_com
-plt.axvline(x=3.76, color = 'k', linestyle='--')
+
 plt.savefig(args.output + ".pdf")
 plt.close()
 
