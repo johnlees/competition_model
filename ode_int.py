@@ -60,7 +60,7 @@ def t_range(start, end, resolution):
 
 # Wrapper for Gillespie algorithm, which is JIT compiled by numba
 def gillespie(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR):
-    ta, Ra, Ca = gillespie_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR)
+    ta, Ra, Ca = tau_leaping_jit(t_init, t_max, R_init, C_init, K, r_res, r_chal, a_RC, a_CR)
     return(np.array(ta), np.column_stack((Ra, Ca)))
 
 # CTMC stochastic algorithm
@@ -304,6 +304,8 @@ if __name__ == '__main__':
     ##########
     # Output #
     ##########
+
+    np.savetxt(args.output_prefix + ".txt", np.hstack((times.reshape(-1, 1), populations)), fmt='%.4f', delimiter="\t")
 
     # Draw plot
     if args.mode == 'sde':

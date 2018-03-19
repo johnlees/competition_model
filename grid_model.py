@@ -38,7 +38,7 @@ if __name__ == '__main__':
               'gamma_res_chal': 1,
               'gamma_chal_res': 1,
               'resolution': args.de_resolution,
-              't_end': 36,
+              't_end': 16,
               'R_size': 10,
               'mode': args.mode}
 
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     t_steps = np.linspace(0, 24, args.grid_resolution)
 
     if args.isogenic:
-        with open(args.output + '.isogenic_runs.txt', 'w') as outfile:
+        with open(args.output + '.isogenic_runs.txt', 'w', 1) as outfile:
             outfile.write("\t".join(["C_size", "t_chal", "avg_R", "avg_C"]) + "\n")
             for C_size in C_steps:
                 #sys.stderr.write("C_size: " + str(C_size) + "\n")
@@ -59,8 +59,11 @@ if __name__ == '__main__':
                         params['gamma_res_chal'], params['gamma_chal_res'], params['beta'], params['resolution'],
                         params['t_com'], t_chal, params['t_end'], C_size, params['R_size'], mode = params['mode'])
 
-                        final_R_pop.append(populations[-1,0])
-                        final_C_pop.append(populations[-1,1])
+                        if not np.isnan(populations[-1,0]) and not np.isnan(populations[-1,1]):
+                            final_R_pop.append(max(0, populations[-1,0]))
+                            final_C_pop.append(max(0, populations[-1,1]))
+                        else:
+                            sys.stderr.write("nan @ C_size: " + str(C_size) + "\tt_chal: " + str(t_chal) + "\n")
 
                     avg_C = sum(final_C_pop)/float(len(final_C_pop))
                     avg_R = sum(final_R_pop)/float(len(final_R_pop))
@@ -83,7 +86,7 @@ if __name__ == '__main__':
     gamma_chal_res_steps = np.power(10, np.linspace(-2, 2, args.grid_resolution))
 
     if args.intergenic:
-        with open(args.output + '.intergenic_runs.txt', 'w') as outfile:
+        with open(args.output + '.intergenic_runs.txt', 'w', 1) as outfile:
             outfile.write("\t".join(["gamma_rc", "gamma_cr", "final_R", "final_C", "domain"]) + "\n")
             for gamma_rc in gamma_res_chal_steps:
                 #sys.stderr.write("gamma: " + str(gamma) + "\n")
@@ -96,8 +99,11 @@ if __name__ == '__main__':
                         gamma_rc, gamma_cr, params['beta'], params['resolution'],
                         params['t_com'], params['t_chal'], params['t_end'], params['C_size'], params['R_size'], mode = params['mode'])
 
-                        final_R_pop.append(populations[-1,0])
-                        final_C_pop.append(populations[-1,1])
+                        if not np.isnan(populations[-1,0]) and not np.isnan(populations[-1,1]):
+                            final_R_pop.append(max(0, populations[-1,0]))
+                            final_C_pop.append(max(0, populations[-1,1]))
+                        else:
+                            sys.stderr.write("nan @ gamma_rc: " + str(gamma_rc) + "\tgamma_cr: " + str(gamma_cr) + "\n")
 
                     avg_R = sum(final_R_pop)/float(len(final_R_pop))
                     avg_C = sum(final_C_pop)/float(len(final_C_pop))
