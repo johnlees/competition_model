@@ -34,7 +34,7 @@ z = np.array(z).reshape(len(np.unique(y)), len(np.unique(x)))
 
 # Smooth out noise
 if args.smooth:
-    z = gaussian_filter(z, 1)
+    z = gaussian_filter(z, 1.2)
 
 #extent = (-3, 4, -4, 3)
 
@@ -47,8 +47,8 @@ cmap = cm.PRGn
 
 fig, ax = plt.subplots()
 ax.set_yscale("log")
-ax.set_xlabel('Arrival time (lag)')
-ax.set_ylabel('Challenger inoculum')
+ax.set_xlabel('Lag in arrival time (hrs)')
+ax.set_ylabel('Challenger inoculum (CFU)')
 
 cset1 = plt.contourf(x, y, z, win_levels, locator=ticker.LogLocator(), colors=('#fc8d59', '#ffffbf'))
                      #cmap=cm.get_cmap(cmap, len(levels) - 1), norm=norm)
@@ -56,11 +56,11 @@ cset1 = plt.contourf(x, y, z, win_levels, locator=ticker.LogLocator(), colors=('
 plt.axvline(x=3.76, color = 'k', linestyle='--', label='t_com')
 plt.text(3.0, 3000, 't_com',rotation=90)
 
-cset2 = plt.contour(x, y, z, all_levels, locator=ticker.LogLocator(), colors='k', linewidths = 1)
-plt.clabel(cset2, fmt='%1.0f', inline=1, fontsize=10)
+#cset2 = plt.contour(x, y, z, all_levels, locator=ticker.LogLocator(), colors='k', linewidths = 1)
+#plt.clabel(cset2, fmt='%1.0f', inline=1, fontsize=10)
 
 # Resident wins boundary
-#cset3 = plt.contour(x, y, z, win_levels, colors='k', linewidths=2)
+cset3 = plt.contour(x, y, z, win_levels, colors='k', linewidths=2)
 plt.title('Isogenic challenger')
 #plt.colorbar(cset1) # legend
 
