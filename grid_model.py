@@ -87,34 +87,38 @@ if __name__ == '__main__':
 
     if args.intergenic:
         with open(args.output + '.intergenic_runs.txt', 'w', 1) as outfile:
-            outfile.write("\t".join(["gamma_rc", "gamma_cr", "final_R", "final_C", "domain"]) + "\n")
+            outfile.write("\t".join(["gamma_rc", "gamma_cr", "avg_final_R", "avg_final_C", "avg_domain"]) + "\n")
             for gamma_rc in gamma_res_chal_steps:
                 #sys.stderr.write("gamma: " + str(gamma) + "\n")
                 for gamma_cr in gamma_chal_res_steps:
                     #sys.stderr.write("r: " + str(r) + "\n")
                     final_R_pop = []
                     final_C_pop = []
+                    domains = []
                     for repeat in range(0, args.repeats):
                         times, populations = solve_integral(params['K'], params['r_res'], params['r_chal'],
                         gamma_rc, gamma_cr, params['beta'], params['resolution'],
                         params['t_com'], params['t_chal'], params['t_end'], params['C_size'], params['R_size'], mode = params['mode'])
 
                         if not np.isnan(populations[-1,0]) and not np.isnan(populations[-1,1]):
+                            if populations[-1,0] > args.threshold and populations[-1,1] > args.threshold:
+                                domain = 0.5 # co-existence
+                            elif populations[-1,0] > args.threshold:
+                                domain = 1 # resident wins
+                            elif populations[-1,1] > args.threshold:
+                                domain = 0 # challenger wins
+                            else:
+                                domain = -1 # both dead
+
                             final_R_pop.append(max(0, populations[-1,0]))
                             final_C_pop.append(max(0, populations[-1,1]))
+                            domains.append(domain)
                         else:
                             sys.stderr.write("nan @ gamma_rc: " + str(gamma_rc) + "\tgamma_cr: " + str(gamma_cr) + "\n")
 
                     avg_R = sum(final_R_pop)/float(len(final_R_pop))
                     avg_C = sum(final_C_pop)/float(len(final_C_pop))
-                    if avg_R > args.threshold and avg_C > args.threshold:
-                        domain = 0.5 # co-existence
-                    elif avg_R > args.threshold:
-                        domain = 1 # resident wins
-                    elif avg_C > args.threshold:
-                        domain = 0 # challenger wins
-                    else:
-                        domain = -1 # both dead
-                    outfile.write("\t".join([str(gamma_rc), str(gamma_cr), str(avg_R), str(avg_C), str(domain)]) + "\n")
+                    avg_domain = sum(domains)/float(len(domains))
+                    outfile.write("\t".join([str(gamma_rc), str(gamma_cr), str(avg_R), str(avg_C), str(avg_domain)]) + "\n")
 
     sys.exit(0)
