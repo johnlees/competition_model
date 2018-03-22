@@ -12,6 +12,7 @@ parser.add_argument('--runs', required=True, help='Runs of simulator')
 parser.add_argument('--output', default='intergenic_domains', help='Output prefix')
 parser.add_argument('--title', default='Intergenic challenger', help='Plot title')
 parser.add_argument('--smooth', action='store_true', default=False, help='Smooth noisy data')
+parser.add_argument('--stochastic', action='store_true', default=False, help='Plot for stochastic data')
 args = parser.parse_args()
 
 x = []
@@ -31,16 +32,18 @@ z = np.array(z).reshape(len(np.unique(y)), len(np.unique(x)))
 
 # Smooth out noise
 if args.smooth:
-    z = gaussian_filter(z, 0.6)
+    z = gaussian_filter(z, 0.2)
 
 #extent = (-3, 4, -4, 3)
 
 # position of contours
-levels=np.array([0, 0.49, 0.51, 1])
-#levels=np.linspace(0,1,11)
+if args.stochastic:
+    levels=np.linspace(0,1,11)
+else:
+    levels=np.array([0, 0.49, 0.51, 1])
 
-norm = cm.colors.Normalize(vmax=1, vmin=0)
-cmap = cm.coolwarm
+#norm = cm.colors.Normalize(vmax=1, vmin=0)
+#cmap = cm.coolwarm
 
 fig, ax = plt.subplots()
 ax.set_xscale("log")
@@ -48,15 +51,18 @@ ax.set_yscale("log")
 ax.set_xlabel('Gamma (challenger -> resident)')
 ax.set_ylabel('Gamma (resident -> challenger)')
 
-cset1 = plt.contourf(x, y, z, levels, colors=('#fc8d59', '#ffffbf', '#91bfdb'))
-#cset1.cmap.set_under('yellow')
-#cset1.cmap.set_over('cyan')
-#cset1 = plt.contourf(x, y, z, levels, cmap='coolwarm')
+if args.stochastic:
+    cset1 = plt.contourf(x, y, z, levels, cmap='PiYG')
+else:
+    cset1 = plt.contourf(x, y, z, levels, colors=('#91bfdb', '#ffffbf', '#fc8d59'))
 
 # Resident wins boundary
-cset3 = plt.contour(x, y, z, levels, colors='k', linewidths=2)
+#cset3 = plt.contour(x, y, z, levels, colors='k', linewidths=2)
+
 plt.title(args.title)
-#plt.colorbar(cset1) # legend
+if args.stochastic:
+    plt.colorbar(cset1) # legend
+
 #plt.clabel(cset3, fmt='%2.1f', colors='k', fontsize=14) # contour labels
 
 # Labels
