@@ -50,7 +50,7 @@ ax.set_yscale("log")
 ax.set_xlabel('Lag in arrival time (hrs)')
 ax.set_ylabel('Challenger inoculum (CFU)')
 
-cset1 = plt.contourf(x, y, z, win_levels, locator=ticker.LogLocator(), colors=('#fc8d59', '#ffffbf'))
+cset1 = plt.contourf(x, y, z, win_levels, locator=ticker.LogLocator(), colors=('#289600', '#ffffff'))
                      #cmap=cm.get_cmap(cmap, len(levels) - 1), norm=norm)
 # t_com
 plt.axvline(x=3.76, color = 'k', linestyle='--', label='t_com')

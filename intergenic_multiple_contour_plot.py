@@ -52,7 +52,7 @@ for tchal in z:
         new_z = gaussian_filter(new_z, 0.6)
 
     if tchal == "1":
-        cset1 = plt.contourf(new_x, new_y, new_z, levels, colors=('#91bfdb', '#ffffbf', '#fc8d59'))
+        cset1 = plt.contourf(new_x, new_y, new_z, levels, colors=('#a200a5', '#ffffff', '#289600'))
 
     cset[tchal] = plt.contour(new_x, new_y, new_z, levels, colors=colors.pop(), linewidths=1, linestyles=linestyles.pop())
 
