@@ -39,6 +39,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=description,
                                          prog='elfi_simulator.py')
     parser.add_argument('--experiments', required=True, help='Experimental data')
+    parser.add_argument('--simulated', default=False, action='store_true', help='Fit to simulated data')
+    parser.add_argument('--beta', type=float, help='beta to simulate')
+    parser.add_argument('--tcom', type=float, help='tcom to simulate')
     args = parser.parse_args()
 
     # experimental setup
@@ -65,19 +68,23 @@ if __name__ == '__main__':
     real_obs = np.asarray(obs)
 
     # Simulate with known beta and t_com to check it works
-    sys.stderr.write("Simulating observations beta = 0.1; t_com = 5.0\n")
-    sim_obs = multi_integral(0.1, 5.0, experimental_conditions, params)
-    np.savetxt("sim_obs.txt", sim_obs)
+    if args.simulated:
+        sys.stderr.write("Simulating observations beta = " + str(args.beta) + "; t_com = " + str(args.tcom) + "\n")
+        sim_obs = multi_integral(args.beta, args.tcom, experimental_conditions, params)
+        np.savetxt("sim_obs.txt", sim_obs)
 
     # ELFI set-up
     # gamma params: a, loc, scale
     sys.stderr.write("Setting up ELFI\n")
-    beta = elfi.Prior(scipy.stats.uniform, 0, 3)
-    t_com = elfi.Prior(scipy.stats.uniform, 1, 5)
+    beta = elfi.Prior(scipy.stats.uniform, 0, 10)
+    t_com = elfi.Prior(scipy.stats.uniform, 0, 10)
 
     vectorized_simulator = elfi.tools.vectorize(multi_integral, [2, 3])
 
-    Y = elfi.Simulator(vectorized_simulator, beta, t_com, experimental_conditions, params, observed=sim_obs)
+    if args.simulated:
+        Y = elfi.Simulator(vectorized_simulator, beta, t_com, experimental_conditions, params, observed=sim_obs)
+    else:
+        Y = elfi.Simulator(vectorized_simulator, beta, t_com, experimental_conditions, params, observed=real_obs)
     S = elfi.Summary(log_destack, Y)
     d = elfi.Distance('euclidean', S)
     log_d = elfi.Operation(np.log, d)
@@ -95,7 +102,7 @@ if __name__ == '__main__':
     # Run fit w/ BOLFI
     sys.stderr.write("BOLFI inference\n")
     bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=10,
-                   bounds={'beta':(0.001, 3), 't_com':(1, 6)}, acq_noise_var=[0.01, 0.01], seed=1)
+                   bounds={'beta':(0.001, 10), 't_com':(0.001, 10)}, acq_noise_var=[0.01, 0.01], seed=1)
     post = bolfi.fit(n_evidence=200)
 
     # Save results

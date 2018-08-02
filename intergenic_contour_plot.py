@@ -15,6 +15,8 @@ parser.add_argument('--smooth', action='store_true', default=False, help='Smooth
 parser.add_argument('--stochastic', action='store_true', default=False, help='Plot for stochastic data')
 args = parser.parse_args()
 
+plt.rcParams.update({'font.size': 14})
+
 x = []
 y = []
 z = []
@@ -59,7 +61,7 @@ else:
 # Resident wins boundary
 #cset3 = plt.contour(x, y, z, levels, colors='k', linewidths=2)
 
-plt.title(args.title)
+plt.title(args.title, y=1.02)
 if args.stochastic:
     plt.colorbar(cset1) # legend
 

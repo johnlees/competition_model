@@ -30,7 +30,7 @@ if __name__ == '__main__':
 
     # sample from BOLFI posterior
     sys.stderr.write("Sampling from BOLFI posterior\n")
-    result_BOLFI = bolfi.sample(1000, info_freq=1000)
+    result_BOLFI = bolfi.sample(2000, info_freq=1000)
 
     print(result_BOLFI)
     np.savetxt("samples.txt", result_BOLFI.samples_array)

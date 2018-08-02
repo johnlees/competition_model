@@ -15,6 +15,8 @@ parser.add_argument('--output', default='isogenic_domains', help='Output prefix'
 parser.add_argument('--smooth', action='store_true', default=False, help='Smooth noisy data')
 args = parser.parse_args()
 
+plt.rcParams.update({'font.size': 14})
+
 x = []
 y = []
 z = []
@@ -54,7 +56,7 @@ cset1 = plt.contourf(x, y, z, win_levels, locator=ticker.LogLocator(), colors=('
                      #cmap=cm.get_cmap(cmap, len(levels) - 1), norm=norm)
 # t_com
 plt.axvline(x=3.76, color = 'k', linestyle='--', label='t_com')
-plt.text(3.0, 3000, 't_com',rotation=90)
+plt.text(2.7, 3000, 't_com',rotation=90)
 
 #cset2 = plt.contour(x, y, z, all_levels, locator=ticker.LogLocator(), colors='k', linewidths = 1)
 #plt.clabel(cset2, fmt='%1.0f', inline=1, fontsize=10)

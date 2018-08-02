@@ -18,6 +18,8 @@ parser.add_argument('--title', default='Intergenic challenger', help='Plot title
 parser.add_argument('--smooth', action='store_true', default=False, help='Smooth noisy data')
 args = parser.parse_args()
 
+plt.rcParams.update({'font.size': 14})
+
 x = defaultdict(list)
 y = defaultdict(list)
 z = defaultdict(list)
