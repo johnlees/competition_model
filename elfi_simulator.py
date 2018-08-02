@@ -76,8 +76,8 @@ if __name__ == '__main__':
     # ELFI set-up
     # gamma params: a, loc, scale
     sys.stderr.write("Setting up ELFI\n")
-    beta = elfi.Prior(scipy.stats.uniform, 0, 10)
-    t_com = elfi.Prior(scipy.stats.uniform, 0, 10)
+    beta = elfi.Prior(scipy.stats.uniform, 0, 3)
+    t_com = elfi.Prior(scipy.stats.uniform, 1, 5)
 
     vectorized_simulator = elfi.tools.vectorize(multi_integral, [2, 3])
 
@@ -102,7 +102,7 @@ if __name__ == '__main__':
     # Run fit w/ BOLFI
     sys.stderr.write("BOLFI inference\n")
     bolfi = elfi.BOLFI(log_d, batch_size=1, initial_evidence=20, update_interval=10,
-                   bounds={'beta':(0.001, 10), 't_com':(0.001, 10)}, acq_noise_var=[0.01, 0.01], seed=1)
+                   bounds={'beta':(0.001, 3), 't_com':(1, 6)}, acq_noise_var=[0.01, 0.01], seed=1)
     post = bolfi.fit(n_evidence=200)
 
     # Save results
